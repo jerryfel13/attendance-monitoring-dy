@@ -1,8 +1,7 @@
 "use client"
 
 import { Label } from "@/components/ui/label"
-
-import { useState, useEffect } from "react"
+import { use, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,34 +9,52 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowLeft, QrCode, Download, RefreshCw, Copy, CheckCircle } from "lucide-react"
 import Link from "next/link"
+import QRCode from 'react-qr-code'
 
-export default function QRManagementPage({ params }: { params: { id: string } }) {
+export default function QRManagementPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use<{ id: string }>(params)
   const [subject, setSubject] = useState<any>(null)
   const [enrollmentQR, setEnrollmentQR] = useState("")
   const [attendanceQR, setAttendanceQR] = useState("")
   const [copied, setCopied] = useState("")
+  const [sessionActive, setSessionActive] = useState(false)
+  const [sessionId, setSessionId] = useState<number | null>(null)
   const router = useRouter()
 
   useEffect(() => {
     const userData = localStorage.getItem("user")
     if (!userData) {
-      router.push("/auth/login?role=teacher")
+      router.push("/auth/login")
       return
     }
+    // Fetch subject from backend
+    fetch(`http://localhost:4000/api/auth/subjects/${id}`)
+      .then(res => res.json())
+      .then(data => {
+        setSubject(data.subject)
+        setEnrollmentQR(`SUBJECT:${data.subject.name} (${data.subject.code})`)
+        setAttendanceQR(`ATTENDANCE:${data.subject.name} (${data.subject.code}) - ${new Date().toLocaleDateString()}`)
+      })
+      .catch(() => setSubject(null))
+    
+    // Check for active session
+    checkActiveSession()
+  }, [id, router])
 
-    // Mock subject data
-    setSubject({
-      id: params.id,
-      name: "Data Structures",
-      code: "CS201",
-      students: 45,
-      schedule: "Mon, Wed, Fri 10:00 AM",
-    })
-
-    // Generate QR codes
-    setEnrollmentQR(`SUBJECT:Data Structures (CS201)`)
-    setAttendanceQR(`ATTENDANCE:Data Structures (CS201) - ${new Date().toLocaleDateString()}`)
-  }, [params.id, router])
+  const checkActiveSession = async () => {
+    try {
+      const response = await fetch(`http://localhost:4000/api/auth/subjects/${id}/sessions/active`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.session) {
+          setSessionActive(true)
+          setSessionId(data.session.id)
+        }
+      }
+    } catch (error) {
+      console.error('Error checking active session:', error)
+    }
+  }
 
   const copyToClipboard = async (text: string, type: string) => {
     try {
@@ -52,6 +69,56 @@ export default function QRManagementPage({ params }: { params: { id: string } })
   const regenerateAttendanceQR = () => {
     const newQR = `ATTENDANCE:${subject.name} (${subject.code}) - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`
     setAttendanceQR(newQR)
+  }
+
+  const startAttendanceSession = async () => {
+    try {
+      const qrData = `ATTENDANCE:${subject.name} (${subject.code}) - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`
+      setAttendanceQR(qrData)
+      
+      const response = await fetch(`http://localhost:4000/api/auth/subjects/${id}/sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_date: new Date().toISOString().split('T')[0],
+          session_time: new Date().toLocaleTimeString(),
+          is_active: true,
+          attendance_qr: qrData
+        })
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setSessionActive(true)
+        setSessionId(data.session.id)
+        console.log('Attendance session started successfully')
+      } else {
+        console.error('Failed to start attendance session')
+      }
+    } catch (error) {
+      console.error('Error starting attendance session:', error)
+    }
+  }
+
+  const stopAttendanceSession = async () => {
+    if (!sessionId) return
+    
+    try {
+      const response = await fetch(`http://localhost:4000/api/auth/sessions/${sessionId}/stop`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      
+      if (response.ok) {
+        setSessionActive(false)
+        setSessionId(null)
+        console.log('Attendance session stopped successfully')
+      } else {
+        console.error('Failed to stop attendance session')
+      }
+    } catch (error) {
+      console.error('Error stopping attendance session:', error)
+    }
   }
 
   if (!subject) return null
@@ -99,10 +166,12 @@ export default function QRManagementPage({ params }: { params: { id: string } })
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Status</CardTitle>
+                <CardTitle className="text-sm font-medium">Session Status</CardTitle>
               </CardHeader>
               <CardContent>
-                <Badge variant="default">Active</Badge>
+                <Badge variant={sessionActive ? "default" : "secondary"}>
+                  {sessionActive ? "Active" : "Inactive"}
+                </Badge>
               </CardContent>
             </Card>
           </div>
@@ -126,7 +195,7 @@ export default function QRManagementPage({ params }: { params: { id: string } })
                   <div className="flex justify-center">
                     <div className="w-64 h-64 bg-white border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
                       <div className="text-center">
-                        <QrCode className="w-24 h-24 text-gray-400 mx-auto mb-4" />
+                        <QRCode value={enrollmentQR} size={200} className="mx-auto mb-4" />
                         <p className="text-sm text-gray-600">QR Code Preview</p>
                       </div>
                     </div>
@@ -179,7 +248,7 @@ export default function QRManagementPage({ params }: { params: { id: string } })
                   <div className="flex justify-center">
                     <div className="w-64 h-64 bg-white border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
                       <div className="text-center">
-                        <QrCode className="w-24 h-24 text-gray-400 mx-auto mb-4" />
+                        <QRCode value={attendanceQR} size={200} className="mx-auto mb-4" />
                         <p className="text-sm text-gray-600">QR Code Preview</p>
                         <Badge variant="secondary" className="mt-2">
                           Session: {new Date().toLocaleDateString()}
@@ -212,15 +281,44 @@ export default function QRManagementPage({ params }: { params: { id: string } })
                     </ul>
                   </div>
 
-                  <div className="flex space-x-2">
-                    <Button className="flex-1">
-                      <Download className="w-4 h-4 mr-2" />
-                      Download QR
-                    </Button>
-                    <Button variant="outline" className="flex-1 bg-transparent">
-                      <QrCode className="w-4 h-4 mr-2" />
-                      Display QR
-                    </Button>
+                  <div className="space-y-3">
+                    <div className="flex space-x-2">
+                      <Button className="flex-1">
+                        <Download className="w-4 h-4 mr-2" />
+                        Download QR
+                      </Button>
+                      <Button variant="outline" className="flex-1 bg-transparent">
+                        <QrCode className="w-4 h-4 mr-2" />
+                        Display QR
+                      </Button>
+                    </div>
+                    
+                    <div className="flex space-x-2">
+                      {sessionActive ? (
+                        <Button 
+                          variant="destructive" 
+                          className="flex-1"
+                          onClick={stopAttendanceSession}
+                        >
+                          Stop Session
+                        </Button>
+                      ) : (
+                        <Button 
+                          className="flex-1"
+                          onClick={startAttendanceSession}
+                        >
+                          Start Attendance Session
+                        </Button>
+                      )}
+                      <Button 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={regenerateAttendanceQR}
+                      >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Regenerate QR
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

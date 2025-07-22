@@ -20,7 +20,7 @@ export default function RegisterPage() {
     password: "",
     confirmPassword: "",
     studentId: "",
-    department: "",
+    // department field removed
   })
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -48,18 +48,27 @@ export default function RegisterPage() {
     }
 
     try {
-      // Simulate registration - replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      // Generate unique ID
-      const uniqueId = `${role.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`
-
-      setSuccess(`Registration successful! Your unique ID is: ${uniqueId}`)
-
-      // Auto redirect after success
+      const res = await fetch("http://localhost:4000/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          role,
+          studentId: role === "student" ? formData.studentId : undefined,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || "Registration failed. Please try again.")
+        setIsLoading(false)
+        return
+      }
+      setSuccess("Registration successful! Redirecting to login...")
       setTimeout(() => {
         router.push(`/auth/login?role=${role}`)
-      }, 3000)
+      }, 2000)
     } catch (err) {
       setError("Registration failed. Please try again.")
     } finally {
@@ -126,22 +135,7 @@ export default function RegisterPage() {
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="department">Department</Label>
-              <Select onValueChange={(value) => handleInputChange("department", value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="computer-science">Computer Science</SelectItem>
-                  <SelectItem value="engineering">Engineering</SelectItem>
-                  <SelectItem value="business">Business</SelectItem>
-                  <SelectItem value="mathematics">Mathematics</SelectItem>
-                  <SelectItem value="physics">Physics</SelectItem>
-                  <SelectItem value="chemistry">Chemistry</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Department field removed */}
 
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>

@@ -1,61 +1,123 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Camera, QrCode, ArrowLeft, CheckCircle } from "lucide-react"
+import { Camera, QrCode, ArrowLeft, CheckCircle, X } from "lucide-react"
 import Link from "next/link"
+import { Html5QrcodeScanner } from "html5-qrcode"
 
 export default function ScanPage() {
   const [qrCode, setQrCode] = useState("")
   const [isScanning, setIsScanning] = useState(false)
+  const [isCameraActive, setIsCameraActive] = useState(false)
   const [result, setResult] = useState<{ type: string; message: string; success: boolean } | null>(null)
+  const [user, setUser] = useState<any>(null)
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null)
   const router = useRouter()
 
   useEffect(() => {
     const userData = localStorage.getItem("user")
     if (!userData) {
-      router.push("/auth/login?role=student")
+      router.push("/auth/login")
       return
     }
+
+    const parsedUser = JSON.parse(userData)
+    if (parsedUser.role !== "student") {
+      router.push("/")
+      return
+    }
+
+    setUser(parsedUser)
   }, [router])
 
-  const handleScan = async () => {
-    if (!qrCode.trim()) return
+  const startCamera = () => {
+    if (isCameraActive) return
+
+    setIsCameraActive(true)
+    setResult(null)
+
+    try {
+      scannerRef.current = new Html5QrcodeScanner(
+        "qr-reader",
+        { 
+          fps: 10, 
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0
+        },
+        false
+      )
+
+      scannerRef.current.render(onScanSuccess, onScanFailure)
+    } catch (error) {
+      console.error("Failed to start camera:", error)
+      setResult({
+        type: "error",
+        message: "Failed to access camera. Please check permissions.",
+        success: false,
+      })
+      setIsCameraActive(false)
+    }
+  }
+
+  const stopCamera = () => {
+    if (scannerRef.current) {
+      scannerRef.current.clear()
+      scannerRef.current = null
+    }
+    setIsCameraActive(false)
+  }
+
+  const onScanSuccess = async (decodedText: string) => {
+    setQrCode(decodedText)
+    await handleScan(decodedText)
+  }
+
+  const onScanFailure = (error: any) => {
+    // Handle scan failure silently
+    console.log("QR scan failed:", error)
+  }
+
+  const handleScan = async (qrData?: string) => {
+    const dataToProcess = qrData || qrCode
+    if (!dataToProcess.trim()) return
 
     setIsScanning(true)
     setResult(null)
 
     try {
-      // Simulate QR code processing
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      // Send QR code data to backend for processing
+      const response = await fetch("http://localhost:4000/api/auth/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          qrCode: dataToProcess,
+          studentId: user?.id,
+        }),
+      })
 
-      // Parse QR code (mock implementation)
-      if (qrCode.startsWith("SUBJECT:")) {
-        // Subject enrollment
-        const subjectInfo = qrCode.replace("SUBJECT:", "")
+      const data = await response.json()
+
+      if (response.ok) {
         setResult({
-          type: "enrollment",
-          message: `Successfully enrolled in ${subjectInfo}!`,
+          type: data.type,
+          message: data.message,
           success: true,
         })
-      } else if (qrCode.startsWith("ATTENDANCE:")) {
-        // Attendance marking
-        const attendanceInfo = qrCode.replace("ATTENDANCE:", "")
-        const currentTime = new Date().toLocaleTimeString()
-        setResult({
-          type: "attendance",
-          message: `Attendance marked for ${attendanceInfo} at ${currentTime}`,
-          success: true,
-        })
+        
+        // Stop camera after successful scan
+        if (isCameraActive) {
+          stopCamera()
+        }
       } else {
         setResult({
           type: "error",
-          message: "Invalid QR code. Please scan a valid subject or attendance QR code.",
+          message: data.error || "Failed to process QR code",
           success: false,
         })
       }
@@ -71,7 +133,6 @@ export default function ScanPage() {
   }
 
   const simulateCamera = () => {
-    // Simulate camera scan with mock data
     const mockQRCodes = [
       "SUBJECT:Data Structures (CS201)",
       "ATTENDANCE:Database Systems (CS301)",
@@ -80,6 +141,15 @@ export default function ScanPage() {
     const randomQR = mockQRCodes[Math.floor(Math.random() * mockQRCodes.length)]
     setQrCode(randomQR)
   }
+
+  // Cleanup camera on component unmount
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.clear()
+      }
+    }
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -110,25 +180,41 @@ export default function ScanPage() {
               <CardDescription>Point your camera at the QR code or enter the code manually</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="qrCode">QR Code Data</Label>
-                <Input
-                  id="qrCode"
-                  placeholder="Enter QR code or scan with camera"
-                  value={qrCode}
-                  onChange={(e) => setQrCode(e.target.value)}
-                />
-              </div>
+              {!isCameraActive ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="qrCode">QR Code Data</Label>
+                    <Input
+                      id="qrCode"
+                      placeholder="Enter QR code or scan with camera"
+                      value={qrCode}
+                      onChange={(e) => setQrCode(e.target.value)}
+                    />
+                  </div>
 
-              <div className="flex space-x-2">
-                <Button onClick={simulateCamera} variant="outline" className="flex-1 bg-transparent">
-                  <Camera className="w-4 h-4 mr-2" />
-                  Simulate Scan
-                </Button>
-                <Button onClick={handleScan} disabled={!qrCode.trim() || isScanning} className="flex-1">
-                  {isScanning ? "Processing..." : "Process QR"}
-                </Button>
-              </div>
+                  <div className="flex space-x-2">
+                    <Button onClick={startCamera} className="flex-1">
+                      <Camera className="w-4 h-4 mr-2" />
+                      Start Camera
+                    </Button>
+                    <Button onClick={simulateCamera} variant="outline" className="flex-1 bg-transparent">
+                      Simulate Scan
+                    </Button>
+                  </div>
+
+                  <Button onClick={() => handleScan()} disabled={!qrCode.trim() || isScanning} className="w-full">
+                    {isScanning ? "Processing..." : "Process QR"}
+                  </Button>
+                </>
+              ) : (
+                <div className="space-y-4">
+                  <div id="qr-reader" className="w-full"></div>
+                  <Button onClick={stopCamera} variant="outline" className="w-full">
+                    <X className="w-4 h-4 mr-2" />
+                    Stop Camera
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 

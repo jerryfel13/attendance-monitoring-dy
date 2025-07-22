@@ -21,7 +21,7 @@ export default function LoginPage() {
 
   const router = useRouter()
   const searchParams = useSearchParams()
-  const role = searchParams.get("role") || "student"
+  // No role selection; backend determines role
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,26 +29,31 @@ export default function LoginPage() {
     setError("")
 
     try {
-      // Simulate login - replace with actual authentication
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      // Store user data in localStorage (replace with proper auth)
-      const userData = {
-        id: Math.random().toString(36).substr(2, 9),
-        email,
-        role,
-        name: email.split("@")[0],
+      const res = await fetch("http://localhost:4000/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || "Invalid credentials. Please try again.")
+        setIsLoading(false)
+        return
       }
-      localStorage.setItem("user", JSON.stringify(userData))
-
-      // Redirect based on role
-      if (role === "teacher") {
+      localStorage.setItem("user", JSON.stringify(data.user))
+      // Redirect based on user role
+      if (data.user.role === "teacher") {
         router.push("/teacher/dashboard")
-      } else {
+      } else if (data.user.role === "student") {
         router.push("/student/dashboard")
+      } else {
+        router.push("/") // fallback
       }
     } catch (err) {
-      setError("Invalid credentials. Please try again.")
+      setError("Login failed. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -58,7 +63,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">{role === "teacher" ? "Teacher" : "Student"} Login</CardTitle>
+          <CardTitle className="text-2xl font-bold">Login</CardTitle>
           <CardDescription>Enter your credentials to access your account</CardDescription>
         </CardHeader>
         <CardContent>
@@ -108,7 +113,7 @@ export default function LoginPage() {
               type="submit"
               className="w-full"
               disabled={isLoading}
-              variant={role === "teacher" ? "default" : "default"}
+              variant="default"
             >
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
@@ -117,7 +122,7 @@ export default function LoginPage() {
           <div className="mt-6 text-center text-sm">
             <p className="text-gray-600">
               Don't have an account?{" "}
-              <Link href={`/auth/register?role=${role}`} className="text-blue-600 hover:underline font-medium">
+              <Link href="/auth/register" className="text-blue-600 hover:underline font-medium">
                 Register here
               </Link>
             </p>

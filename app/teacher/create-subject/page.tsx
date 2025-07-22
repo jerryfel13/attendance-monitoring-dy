@@ -54,15 +54,39 @@ export default function CreateSubjectPage() {
     setIsLoading(true)
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      const userData = localStorage.getItem("user")
+      if (!userData) {
+        router.push("/auth/login")
+        return
+      }
+      const user = JSON.parse(userData)
+
+      const res = await fetch("http://localhost:4000/api/auth/subjects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          code: formData.code,
+          description: formData.description,
+          teacher_id: user.id,
+          schedule_days: formData.days,
+          start_time: formData.startTime,
+          end_time: formData.endTime,
+          late_threshold: parseInt(formData.lateThreshold),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        console.error("Failed to create subject:", data.error)
+        return
+      }
 
       // Generate QR code data
       const qrData = `SUBJECT:${formData.name} (${formData.code})`
       setQrCode(qrData)
       setSuccess(true)
     } catch (error) {
-      console.error("Failed to create subject")
+      console.error("Failed to create subject:", error)
     } finally {
       setIsLoading(false)
     }

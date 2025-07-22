@@ -26,7 +26,7 @@ export default function StudentDashboard() {
   useEffect(() => {
     const userData = localStorage.getItem("user")
     if (!userData) {
-      router.push("/auth/login?role=student")
+      router.push("/auth/login")
       return
     }
 
@@ -38,36 +38,13 @@ export default function StudentDashboard() {
 
     setUser(parsedUser)
 
-    // Mock subjects data
-    setSubjects([
-      {
-        id: "1",
-        name: "Data Structures",
-        code: "CS201",
-        teacher: "Dr. Smith",
-        schedule: "Mon, Wed, Fri 10:00 AM",
-        enrolled: true,
-        attendanceRate: 85,
-      },
-      {
-        id: "2",
-        name: "Database Systems",
-        code: "CS301",
-        teacher: "Prof. Johnson",
-        schedule: "Tue, Thu 2:00 PM",
-        enrolled: true,
-        attendanceRate: 92,
-      },
-      {
-        id: "3",
-        name: "Web Development",
-        code: "CS401",
-        teacher: "Dr. Brown",
-        schedule: "Mon, Wed 3:00 PM",
-        enrolled: false,
-        attendanceRate: 0,
-      },
-    ])
+    // Fetch real subjects data from backend
+    fetch(`http://localhost:4000/api/auth/student/subjects?studentId=${parsedUser.id}`)
+      .then(res => res.json())
+      .then(data => {
+        setSubjects(data.subjects || [])
+      })
+      .catch(() => setSubjects([]))
   }, [router])
 
   const handleLogout = () => {
