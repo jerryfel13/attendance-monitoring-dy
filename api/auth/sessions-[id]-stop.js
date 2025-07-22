@@ -35,6 +35,7 @@ export default async function handler(req, res) {
       'UPDATE attendance_sessions SET is_active = false WHERE id = $1 RETURNING id, session_date, session_time, is_active',
       [id]
     );
+    
     res.json({ 
       session: result.rows[0],
       absentCount: absentStudents.length,
