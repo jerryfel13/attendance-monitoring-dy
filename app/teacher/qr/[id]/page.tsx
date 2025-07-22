@@ -21,6 +21,10 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
   const [copied, setCopied] = useState("")
   const [sessionActive, setSessionActive] = useState(false)
   const [sessionId, setSessionId] = useState<number | null>(null)
+  const [manualInCode, setManualInCode] = useState<string>("");
+  const [manualOutCode, setManualOutCode] = useState<string>("");
+  const [manualInLoading, setManualInLoading] = useState(false);
+  const [manualOutLoading, setManualOutLoading] = useState(false);
   const router = useRouter()
 
   useEffect(() => {
@@ -114,6 +118,31 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
       console.error('Error stopping attendance session:', error)
     }
   }
+
+  const generateManualInCode = async () => {
+    if (!sessionId) return;
+    setManualInLoading(true);
+    try {
+      const data = await apiClient.auth.generateManualCode({ sessionId: String(sessionId), type: 'in' });
+      setManualInCode(data.code);
+    } catch (err) {
+      setManualInCode('Error');
+    } finally {
+      setManualInLoading(false);
+    }
+  };
+  const generateManualOutCode = async () => {
+    if (!sessionId) return;
+    setManualOutLoading(true);
+    try {
+      const data = await apiClient.auth.generateManualCode({ sessionId: String(sessionId), type: 'out' });
+      setManualOutCode(data.code);
+    } catch (err) {
+      setManualOutCode('Error');
+    } finally {
+      setManualOutLoading(false);
+    }
+  };
 
   if (!subject) return null
 
@@ -315,6 +344,17 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                       </Button>
                     </div>
                   </div>
+                  <div className="mt-4">
+                    <Button onClick={generateManualInCode} disabled={manualInLoading || !sessionActive} className="w-full mb-2">
+                      {manualInLoading ? 'Generating...' : 'Generate Manual Code (In)'}
+                    </Button>
+                    {manualInCode && (
+                      <div className="text-center mt-2">
+                        <span className="font-mono text-lg bg-gray-100 px-4 py-2 rounded">{manualInCode}</span>
+                        <span className="ml-2 text-xs text-gray-500">Give this code to the student for manual attendance in</span>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -368,6 +408,17 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                       <li>• Students must scan out to confirm their attendance</li>
                       <li>• If a student does not scan out, they will be marked absent</li>
                     </ul>
+                  </div>
+                  <div className="mt-4">
+                    <Button onClick={generateManualOutCode} disabled={manualOutLoading || !sessionActive} className="w-full mb-2">
+                      {manualOutLoading ? 'Generating...' : 'Generate Manual Code (Out)'}
+                    </Button>
+                    {manualOutCode && (
+                      <div className="text-center mt-2">
+                        <span className="font-mono text-lg bg-gray-100 px-4 py-2 rounded">{manualOutCode}</span>
+                        <span className="ml-2 text-xs text-gray-500">Give this code to the student for manual attendance out</span>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

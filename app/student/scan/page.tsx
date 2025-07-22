@@ -20,6 +20,8 @@ export default function ScanPage() {
   const [user, setUser] = useState<any>(null)
   const scannerRef = useRef<Html5QrcodeScanner | null>(null)
   const router = useRouter()
+  const [manualCode, setManualCode] = useState("");
+  const [manualSubmitting, setManualSubmitting] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem("user")
@@ -126,6 +128,21 @@ export default function ScanPage() {
     setQrCode(randomQR)
   }
 
+  const handleManualCode = async () => {
+    if (!manualCode.trim() || !user?.id) return;
+    setManualSubmitting(true);
+    setResult(null);
+    try {
+      const data = await apiClient.auth.submitManualCode({ code: manualCode.trim(), studentId: String(user.id) });
+      setResult({ type: 'manual', message: data.message, success: true });
+      setManualCode("");
+    } catch (error: any) {
+      setResult({ type: 'manual', message: error.message || 'Failed to process manual code.', success: false });
+    } finally {
+      setManualSubmitting(false);
+    }
+  };
+
   // Cleanup camera on component unmount
   useEffect(() => {
     return () => {
@@ -191,6 +208,20 @@ export default function ScanPage() {
                   <Button onClick={() => handleScan()} disabled={!qrCode.trim() || isScanning} className="w-full">
                     {isScanning ? "Processing..." : "Process QR"}
                   </Button>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="manualCode">Manual Attendance Code</Label>
+                    <Input
+                      id="manualCode"
+                      placeholder="Enter manual code from teacher"
+                      value={manualCode}
+                      onChange={(e) => setManualCode(e.target.value)}
+                      autoComplete="off"
+                    />
+                    <Button onClick={handleManualCode} disabled={!manualCode.trim() || manualSubmitting} className="w-full mt-2">
+                      {manualSubmitting ? "Submitting..." : "Submit Manual Code"}
+                    </Button>
+                  </div>
                 </>
               ) : (
                 <div className="space-y-4">

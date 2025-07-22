@@ -1,5 +1,6 @@
 import { Pool } from 'pg';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -245,6 +246,100 @@ export default async function handler(req, res) {
         message: 'Failed to process QR code',
         success: false 
       });
+    }
+  }
+
+  // Generate manual code (teacher)
+  if (route === 'generate-manual-code' && req.method === 'POST') {
+    const { sessionId, type } = req.body;
+    if (!sessionId || !['in', 'out'].includes(type)) {
+      return res.status(400).json({ error: 'Missing or invalid sessionId/type' });
+    }
+    try {
+      // Generate a random 6-character alphanumeric code
+      const code = crypto.randomBytes(4).toString('hex').slice(0, 6).toUpperCase();
+      // Store in DB
+      await pool.query(
+        'INSERT INTO manual_attendance_codes (session_id, type, code) VALUES ($1, $2, $3)',
+        [sessionId, type, code]
+      );
+      return res.json({ code });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to generate manual code', details: err.message });
+    }
+  }
+
+  // Student submits manual code
+  if (route === 'manual-code' && req.method === 'POST') {
+    const { code, studentId } = req.body;
+    if (!code || !studentId) {
+      return res.status(400).json({ error: 'Missing code or studentId' });
+    }
+    try {
+      // Find unused code
+      const result = await pool.query(
+        'SELECT id, session_id, type, used FROM manual_attendance_codes WHERE code = $1 AND used = false',
+        [code]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Invalid or already used code' });
+      }
+      const manualCode = result.rows[0];
+      // Mark code as used
+      await pool.query(
+        'UPDATE manual_attendance_codes SET used = true WHERE id = $1',
+        [manualCode.id]
+      );
+      // Mark attendance (in or out)
+      if (manualCode.type === 'in') {
+        // Only allow if not already scanned in
+        const attendanceCheck = await pool.query(
+          'SELECT id FROM attendance_records WHERE session_id = $1 AND student_id = $2',
+          [manualCode.session_id, studentId]
+        );
+        if (attendanceCheck.rows.length > 0) {
+          return res.status(409).json({ error: 'Already scanned in for this session' });
+        }
+        await pool.query(
+          'INSERT INTO attendance_records (session_id, student_id, status, check_in_time) VALUES ($1, $2, $3, NOW())',
+          [manualCode.session_id, studentId, 'pending']
+        );
+        return res.json({ message: 'Manual scan-in successful. Please scan out or ask for a manual code at the end of class.' });
+      } else if (manualCode.type === 'out') {
+        // Only allow if already scanned in and not scanned out
+        const recordResult = await pool.query(
+          'SELECT id, check_in_time FROM attendance_records WHERE session_id = $1 AND student_id = $2',
+          [manualCode.session_id, studentId]
+        );
+        if (recordResult.rows.length === 0) {
+          return res.status(404).json({ error: 'No scan-in record found. Please scan in first.' });
+        }
+        const record = recordResult.rows[0];
+        // Get session info for late threshold
+        const sessionData = await pool.query(
+          'SELECT s.session_time, s.session_date, sub.late_threshold FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
+          [manualCode.session_id]
+        );
+        const session = sessionData.rows[0];
+        const lateThreshold = session.late_threshold || 15;
+        const sessionTime = new Date(`${session.session_date}T${session.session_time}`);
+        const checkInTime = new Date(record.check_in_time);
+        const timeDifference = (checkInTime.getTime() - sessionTime.getTime()) / (1000 * 60);
+        let attendanceStatus = 'present';
+        if (timeDifference > lateThreshold) {
+          attendanceStatus = 'late';
+        }
+        // Update record with check_out_time and final status
+        await pool.query(
+          'UPDATE attendance_records SET check_out_time = NOW(), status = $1 WHERE id = $2',
+          [attendanceStatus, record.id]
+        );
+        return res.json({ message: 'Manual scan-out successful. Your attendance is confirmed.' });
+      } else {
+        return res.status(400).json({ error: 'Invalid code type' });
+      }
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to process manual code', details: err.message });
     }
   }
 

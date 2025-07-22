@@ -44,6 +44,14 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+    generateManualCode: (data: { sessionId: string, type: 'in' | 'out' }) => apiClient.request('/auth?route=generate-manual-code', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    submitManualCode: (data: { code: string, studentId: string }) => apiClient.request('/auth?route=manual-code', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   },
   teacher: {
     getSubjects: (teacherId: string) => apiClient.request(`/subjects?route=teacher-subjects&teacherId=${teacherId}`),

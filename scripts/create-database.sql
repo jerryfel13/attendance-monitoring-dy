@@ -63,6 +63,16 @@ CREATE TABLE IF NOT EXISTS attendance_records (
     UNIQUE(session_id, student_id)
 );
 
+-- Table for manual attendance codes
+CREATE TABLE IF NOT EXISTS manual_attendance_codes (
+    id SERIAL PRIMARY KEY,
+    session_id INTEGER REFERENCES attendance_sessions(id) ON DELETE CASCADE,
+    type VARCHAR(10) NOT NULL CHECK (type IN ('in', 'out')),
+    code VARCHAR(20) NOT NULL,
+    used BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
