@@ -7,25 +7,37 @@ const authRoutes = require('./routes/auth');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// CORS configuration - More permissive for development
+// CORS configuration - Very permissive for development
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
+  'http://localhost:5173',
   'https://v0-attendance-system-design-eight.vercel.app',
   'https://attendance-system-design-eight.vercel.app',
   'https://*.vercel.app',
   'https://*.railway.app',
+  'https://railway.com',
   process.env.FRONTEND_URL
 ].filter(Boolean);
+
+console.log('🚀 Starting server with CORS configuration...');
+console.log('📋 Allowed origins:', allowedOrigins);
+console.log('🌐 FRONTEND_URL:', process.env.FRONTEND_URL);
 
 // Middleware
 app.use(cors({
   origin: function (origin, callback) {
+    console.log('🔍 CORS check for origin:', origin);
+    
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      console.log('✅ Allowing request with no origin');
+      return callback(null, true);
+    }
     
     // Check if origin is in allowed list
     if (allowedOrigins.indexOf(origin) !== -1) {
+      console.log('✅ Origin allowed:', origin);
       return callback(null, true);
     }
     
@@ -33,17 +45,21 @@ app.use(cors({
     const isAllowed = allowedOrigins.some(allowed => {
       if (allowed.includes('*')) {
         const pattern = allowed.replace('*', '.*');
-        return new RegExp(pattern).test(origin);
+        const regex = new RegExp(pattern);
+        const matches = regex.test(origin);
+        console.log(`🔍 Wildcard check: ${allowed} -> ${origin} = ${matches}`);
+        return matches;
       }
       return allowed === origin;
     });
     
     if (isAllowed) {
+      console.log('✅ Origin allowed via wildcard:', origin);
       return callback(null, true);
     }
     
-    console.log('CORS blocked origin:', origin);
-    console.log('Allowed origins:', allowedOrigins);
+    console.log('❌ CORS blocked origin:', origin);
+    console.log('📋 Allowed origins:', allowedOrigins);
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
@@ -64,7 +80,8 @@ app.get('/health', (req, res) => {
     message: 'Attendance API is running',
     cors: {
       allowedOrigins: allowedOrigins,
-      frontendUrl: process.env.FRONTEND_URL
+      frontendUrl: process.env.FRONTEND_URL,
+      currentOrigin: req.headers.origin
     }
   });
 });
@@ -74,7 +91,7 @@ app.use('/api/auth', authRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Error:', err.message);
+  console.error('❌ Error:', err.message);
   if (err.message === 'Not allowed by CORS') {
     return res.status(403).json({ 
       error: 'CORS error', 
