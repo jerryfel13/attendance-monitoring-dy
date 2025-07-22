@@ -107,6 +107,7 @@ export default async function handler(req, res) {
           success: true
         });
       } else if (qrCode.startsWith("ATTENDANCE:")) {
+        // SCAN-IN logic
         const attendanceInfo = qrCode.replace("ATTENDANCE:", "").trim();
         const match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)/);
         if (!match) {
@@ -144,6 +145,7 @@ export default async function handler(req, res) {
           });
         }
         const sessionId = sessionResult.rows[0].id;
+        // Check if already scanned in
         const attendanceCheck = await pool.query(
           'SELECT id FROM attendance_records WHERE session_id = $1 AND student_id = $2',
           [sessionId, studentId]
@@ -151,39 +153,83 @@ export default async function handler(req, res) {
         if (attendanceCheck.rows.length > 0) {
           return res.status(409).json({ 
             type: 'attendance',
-            message: 'Attendance already marked for this session',
+            message: 'Already scanned in for this session. Please scan out at the end of class.',
             success: false 
           });
         }
+        // Insert with status 'pending'
+        await pool.query(
+          'INSERT INTO attendance_records (session_id, student_id, status, check_in_time) VALUES ($1, $2, $3, NOW())',
+          [sessionId, studentId, 'pending']
+        );
+        return res.json({
+          type: 'attendance',
+          message: `Scan-in successful. Please scan out at the end of class to confirm your attendance.`,
+          success: true
+        });
+      } else if (qrCode.startsWith("ATTENDANCE-OUT:")) {
+        // SCAN-OUT logic
+        const attendanceInfo = qrCode.replace("ATTENDANCE-OUT:", "").trim();
+        const match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)/);
+        if (!match) {
+          return res.status(400).json({ error: 'Invalid attendance QR code format' });
+        }
+        const [, subjectName, subjectCode] = match;
+        const subjectResult = await pool.query(
+          'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
+          [subjectName.trim(), subjectCode.trim()]
+        );
+        if (subjectResult.rows.length === 0) {
+          return res.status(404).json({ error: 'Subject not found' });
+        }
+        const subjectId = subjectResult.rows[0].id;
+        const sessionResult = await pool.query(
+          'SELECT id FROM attendance_sessions WHERE subject_id = $1 AND is_active = true ORDER BY session_date DESC, session_time DESC LIMIT 1',
+          [subjectId]
+        );
+        if (sessionResult.rows.length === 0) {
+          return res.status(404).json({ 
+            type: 'attendance',
+            message: 'No active attendance session found for this subject',
+            success: false 
+          });
+        }
+        const sessionId = sessionResult.rows[0].id;
+        // Get scan-in record
+        const recordResult = await pool.query(
+          'SELECT id, check_in_time FROM attendance_records WHERE session_id = $1 AND student_id = $2',
+          [sessionId, studentId]
+        );
+        if (recordResult.rows.length === 0) {
+          return res.status(404).json({ 
+            type: 'attendance',
+            message: 'No scan-in record found. Please scan in first.',
+            success: false 
+          });
+        }
+        const record = recordResult.rows[0];
+        // Get session info for late threshold
         const sessionData = await pool.query(
           'SELECT s.session_time, s.session_date, sub.late_threshold FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
           [sessionId]
         );
-        if (sessionData.rows.length === 0) {
-          return res.status(404).json({ 
-            type: 'attendance',
-            message: 'Session data not found',
-            success: false 
-          });
-        }
         const session = sessionData.rows[0];
         const lateThreshold = session.late_threshold || 15;
         const sessionTime = new Date(`${session.session_date}T${session.session_time}`);
-        const currentTime = new Date();
-        const timeDifference = (currentTime.getTime() - sessionTime.getTime()) / (1000 * 60);
+        const checkInTime = new Date(record.check_in_time);
+        const timeDifference = (checkInTime.getTime() - sessionTime.getTime()) / (1000 * 60);
         let attendanceStatus = 'present';
-        let statusMessage = 'Attendance marked';
         if (timeDifference > lateThreshold) {
           attendanceStatus = 'late';
-          statusMessage = `Attendance marked (LATE - ${Math.round(timeDifference)} minutes after start)`;
         }
+        // Update record with check_out_time and final status
         await pool.query(
-          'INSERT INTO attendance_records (session_id, student_id, status) VALUES ($1, $2, $3)',
-          [sessionId, studentId, attendanceStatus]
+          'UPDATE attendance_records SET check_out_time = NOW(), status = $1 WHERE id = $2',
+          [attendanceStatus, record.id]
         );
         return res.json({
           type: 'attendance',
-          message: `${statusMessage} for ${subjectName} (${subjectCode}) at ${new Date().toLocaleTimeString()}`,
+          message: 'Scan-out successful. Your attendance is confirmed.',
           success: true
         });
       } else {
@@ -199,6 +245,29 @@ export default async function handler(req, res) {
         message: 'Failed to process QR code',
         success: false 
       });
+    }
+  }
+
+  // STOP SESSION: Mark absent if not scanned out
+  if (route === 'stop-session' && req.method === 'PUT') {
+    const { sessionId } = req.query;
+    if (!sessionId) {
+      return res.status(400).json({ error: 'Missing sessionId' });
+    }
+    try {
+      // Set all pending records to absent
+      await pool.query(
+        `UPDATE attendance_records SET status = 'absent' WHERE session_id = $1 AND status = 'pending'`,
+        [sessionId]
+      );
+      // Deactivate the session
+      await pool.query(
+        'UPDATE attendance_sessions SET is_active = false WHERE id = $1',
+        [sessionId]
+      );
+      return res.json({ message: 'Session stopped. Absentees marked for students who did not scan out.' });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to stop session', details: err.message });
     }
   }
 

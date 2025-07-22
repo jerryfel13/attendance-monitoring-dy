@@ -17,6 +17,7 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
   const [subject, setSubject] = useState<any>(null)
   const [enrollmentQR, setEnrollmentQR] = useState("")
   const [attendanceQR, setAttendanceQR] = useState("")
+  const [attendanceOutQR, setAttendanceOutQR] = useState("");
   const [copied, setCopied] = useState("")
   const [sessionActive, setSessionActive] = useState(false)
   const [sessionId, setSessionId] = useState<number | null>(null)
@@ -41,6 +42,7 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
         setSubject(data.subject)
         setEnrollmentQR(`SUBJECT:${data.subject.name} (${data.subject.code})`)
         setAttendanceQR(`ATTENDANCE:${data.subject.name} (${data.subject.code}) - ${new Date().toLocaleDateString()}`)
+        setAttendanceOutQR(`ATTENDANCE-OUT:${data.subject.name} (${data.subject.code}) - ${new Date().toLocaleDateString()}`)
       })
       .catch(() => setSubject(null))
     // Check for active session
@@ -72,6 +74,7 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
   const regenerateAttendanceQR = () => {
     const newQR = `ATTENDANCE:${subject.name} (${subject.code}) - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`
     setAttendanceQR(newQR)
+    setAttendanceOutQR(`ATTENDANCE-OUT:${subject.name} (${subject.code}) - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`)
   }
 
   const startAttendanceSession = async () => {
@@ -168,9 +171,10 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
           </div>
 
           <Tabs defaultValue="enrollment" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="enrollment">Enrollment QR</TabsTrigger>
-              <TabsTrigger value="attendance">Attendance QR</TabsTrigger>
+              <TabsTrigger value="attendance">Attendance In QR</TabsTrigger>
+              <TabsTrigger value="attendance-out">Attendance Out QR</TabsTrigger>
             </TabsList>
 
             <TabsContent value="enrollment" className="space-y-6">
@@ -310,6 +314,60 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                         Regenerate QR
                       </Button>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="attendance-out" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <QrCode className="w-5 h-5" />
+                      <span>Attendance Out QR Code</span>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={regenerateAttendanceQR}>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Regenerate
+                    </Button>
+                  </CardTitle>
+                  <CardDescription>Students scan this code at the end of class to confirm their attendance</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="flex justify-center">
+                    <div className="w-64 h-64 bg-white border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                      <div className="text-center">
+                        <QRCode value={attendanceOutQR} size={200} className="mx-auto mb-4" />
+                        <p className="text-sm text-gray-600">QR Code Preview</p>
+                        <Badge variant="secondary" className="mt-2">
+                          Session: {new Date().toLocaleDateString()}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <Label className="text-sm font-medium">QR Code Data:</Label>
+                      <Button variant="ghost" size="sm" onClick={() => copyToClipboard(attendanceOutQR, "attendance-out")}> 
+                        {copied === "attendance-out" ? (
+                          <CheckCircle className="w-4 h-4 text-green-600" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-sm font-mono bg-white p-2 rounded border break-all">{attendanceOutQR}</p>
+                  </div>
+
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-blue-900 mb-2">Usage Instructions:</h4>
+                    <ul className="text-sm text-blue-800 space-y-1">
+                      <li>• Display this QR code at the end of each class</li>
+                      <li>• Students must scan out to confirm their attendance</li>
+                      <li>• If a student does not scan out, they will be marked absent</li>
+                    </ul>
                   </div>
                 </CardContent>
               </Card>

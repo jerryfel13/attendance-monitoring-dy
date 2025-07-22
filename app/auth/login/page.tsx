@@ -40,7 +40,7 @@ export default function LoginPage() {
       })
       
       localStorage.setItem("user", JSON.stringify(data.user))
-      
+
       if (data.user.role === "teacher") {
         router.push("/teacher/dashboard")
       } else {
