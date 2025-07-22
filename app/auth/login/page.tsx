@@ -1,27 +1,32 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Eye, EyeOff } from "lucide-react"
+import { apiClient } from "@/lib/api"
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const role = searchParams.get("role") || "student"
+
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  })
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
 
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  // No role selection; backend determines role
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,31 +34,20 @@ export default function LoginPage() {
     setError("")
 
     try {
-      const res = await fetch("https://hospitable-essence.railway.app/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
+      const data = await apiClient.auth.login({
+        email: formData.email,
+        password: formData.password,
       })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.error || "Invalid credentials. Please try again.")
-        setIsLoading(false)
-        return
-      }
+      
       localStorage.setItem("user", JSON.stringify(data.user))
-      // Redirect based on user role
+      
       if (data.user.role === "teacher") {
         router.push("/teacher/dashboard")
-      } else if (data.user.role === "student") {
-        router.push("/student/dashboard")
       } else {
-        router.push("/") // fallback
+        router.push("/student/dashboard")
       }
-    } catch (err) {
-      setError("Login failed. Please try again.")
+    } catch (err: any) {
+      setError(err.message || "Login failed. Please check your credentials.")
     } finally {
       setIsLoading(false)
     }
@@ -80,8 +74,8 @@ export default function LoginPage() {
                 id="email"
                 type="email"
                 placeholder="Enter your email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={formData.email}
+                onChange={(e) => handleInputChange("email", e.target.value)}
                 required
               />
             </div>
@@ -93,8 +87,8 @@ export default function LoginPage() {
                   id="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={formData.password}
+                  onChange={(e) => handleInputChange("password", e.target.value)}
                   required
                 />
                 <Button

@@ -1,38 +1,36 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Eye, EyeOff } from "lucide-react"
+import { apiClient } from "@/lib/api"
 
 export default function RegisterPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const role = searchParams.get("role") || "student"
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
     studentId: "",
-    // department field removed
   })
+
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
 
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const role = searchParams.get("role") || "student"
-
   const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
+    setFormData(prev => ({ ...prev, [field]: value }))
   }
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -48,29 +46,20 @@ export default function RegisterPage() {
     }
 
     try {
-      const res = await fetch("https://hospitable-essence.railway.app/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          role,
-          studentId: role === "student" ? formData.studentId : undefined,
-        }),
+      const data = await apiClient.auth.register({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        role,
+        studentId: role === "student" ? formData.studentId : undefined,
       })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.error || "Registration failed. Please try again.")
-        setIsLoading(false)
-        return
-      }
+      
       setSuccess("Registration successful! Redirecting to login...")
       setTimeout(() => {
         router.push(`/auth/login?role=${role}`)
       }, 2000)
-    } catch (err) {
-      setError("Registration failed. Please try again.")
+    } catch (err: any) {
+      setError(err.message || "Registration failed. Please try again.")
     } finally {
       setIsLoading(false)
     }
