@@ -20,7 +20,7 @@ const allowedOrigins = [
   'https://railway.com',
   process.env.FRONTEND_URL
 ].filter(Boolean);
-
+ 
 console.log('🚀 Starting server with CORS configuration...');
 console.log('📋 Allowed origins:', allowedOrigins);
 console.log('🌐 FRONTEND_URL:', process.env.FRONTEND_URL);
