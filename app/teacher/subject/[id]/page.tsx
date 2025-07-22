@@ -11,10 +11,11 @@ import { ArrowLeft, Users, Clock, Calendar, TrendingUp, AlertTriangle, User, Log
 import Link from "next/link"
 import { Label } from "@/components/ui/label"
 import { apiClient } from "@/lib/api"
-import { Select } from "@/components/ui/select"
+import { Select as ShadSelect, SelectTrigger, SelectContent, SelectItem } from "@/components/ui/select";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import { useToast } from "@/hooks/use-toast";
 
 interface Student {
   id: number
@@ -53,6 +54,7 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
   const [sessionAttendance, setSessionAttendance] = useState<any[]>([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [removingStudentId, setRemovingStudentId] = useState<number | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     const userData = localStorage.getItem("user")
@@ -146,9 +148,11 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
         studentId: String(studentId),
         status,
       });
-      setAttendanceUpdateResult((prev) => ({ ...prev, [studentId]: "Updated!" }));
+      toast({ title: "Attendance updated!", description: `Status set to '${status.charAt(0).toUpperCase() + status.slice(1)}'.` });
+      setAttendanceUpdateResult((prev) => ({ ...prev, [studentId]: "" }));
       refetchAll();
     } catch (err: any) {
+      toast({ title: "Error updating attendance", description: err.message || "Error", variant: "destructive" });
       setAttendanceUpdateResult((prev) => ({ ...prev, [studentId]: err.message || "Error" }));
     } finally {
       setAttendanceUpdateLoading((prev) => ({ ...prev, [studentId]: false }));
@@ -357,33 +361,18 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
                         <TableCell>{student.absent_sessions}</TableCell>
                         <TableCell>
                           <div className="flex flex-col gap-1">
-                            <Button
-                              size="sm"
-                              variant="outline"
+                            <ShadSelect
+                              value=""
+                              onValueChange={value => handleManualAttendanceUpdate(student.id, value as 'present' | 'late' | 'absent')}
                               disabled={!selectedSessionId || attendanceUpdateLoading[student.id]}
-                              onClick={() => handleManualAttendanceUpdate(student.id, "present")}
                             >
-                              Present
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={!selectedSessionId || attendanceUpdateLoading[student.id]}
-                              onClick={() => handleManualAttendanceUpdate(student.id, "late")}
-                            >
-                              Late
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={!selectedSessionId || attendanceUpdateLoading[student.id]}
-                              onClick={() => handleManualAttendanceUpdate(student.id, "absent")}
-                            >
-                              Absent
-                            </Button>
-                            {attendanceUpdateResult[student.id] && (
-                              <span className="text-xs text-green-600">{attendanceUpdateResult[student.id]}</span>
-                            )}
+                              <SelectTrigger className="w-full">Update Status</SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="present">Present</SelectItem>
+                                <SelectItem value="late">Late</SelectItem>
+                                <SelectItem value="absent">Absent</SelectItem>
+                              </SelectContent>
+                            </ShadSelect>
                           </div>
                         </TableCell>
                         <TableCell>

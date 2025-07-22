@@ -11,17 +11,18 @@ import { Camera, QrCode, ArrowLeft, CheckCircle, X } from "lucide-react"
 import Link from "next/link"
 import { Html5QrcodeScanner } from "html5-qrcode"
 import { apiClient } from "@/lib/api"
+import { useToast } from "@/hooks/use-toast";
 
 export default function ScanPage() {
   const [qrCode, setQrCode] = useState("")
   const [isScanning, setIsScanning] = useState(false)
   const [isCameraActive, setIsCameraActive] = useState(false)
-  const [result, setResult] = useState<{ type: string; message: string; success: boolean } | null>(null)
   const [user, setUser] = useState<any>(null)
   const scannerRef = useRef<Html5QrcodeScanner | null>(null)
   const router = useRouter()
   const [manualCode, setManualCode] = useState("");
   const [manualSubmitting, setManualSubmitting] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     const userData = localStorage.getItem("user")
@@ -43,7 +44,6 @@ export default function ScanPage() {
     if (isCameraActive) return
 
     setIsCameraActive(true)
-    setResult(null)
 
     try {
       scannerRef.current = new Html5QrcodeScanner(
@@ -59,11 +59,11 @@ export default function ScanPage() {
       scannerRef.current.render(onScanSuccess, onScanFailure)
     } catch (error) {
       console.error("Failed to start camera:", error)
-      setResult({
-        type: "error",
-        message: "Failed to access camera. Please check permissions.",
-        success: false,
-      })
+      toast({
+        title: "Error",
+        description: "Failed to access camera. Please check permissions.",
+        variant: "destructive"
+      });
       setIsCameraActive(false)
     }
   }
@@ -91,7 +91,6 @@ export default function ScanPage() {
     if (!dataToProcess.trim()) return
 
     setIsScanning(true)
-    setResult(null)
 
     try {
       // Use the new apiClient route
@@ -99,20 +98,20 @@ export default function ScanPage() {
         qrCode: dataToProcess,
         studentId: user?.id,
       })
-      setResult({
-        type: data.type,
-        message: data.message,
-        success: data.success,
-      })
+      toast({
+        title: data.success ? "Success" : "Error",
+        description: data.message,
+        variant: data.success ? "default" : "destructive"
+      });
       if (isCameraActive && data.success) {
         stopCamera()
       }
     } catch (error: any) {
-      setResult({
-        type: "error",
-        message: error.message || "Failed to process QR code. Please try again.",
-        success: false,
-      })
+      toast({
+        title: "Error",
+        description: error.message || "Failed to process QR code. Please try again.",
+        variant: "destructive"
+      });
     } finally {
       setIsScanning(false)
     }
@@ -131,13 +130,20 @@ export default function ScanPage() {
   const handleManualCode = async () => {
     if (!manualCode.trim() || !user?.id) return;
     setManualSubmitting(true);
-    setResult(null);
     try {
       const data = await apiClient.auth.submitManualCode({ code: manualCode.trim(), studentId: String(user.id) });
-      setResult({ type: 'manual', message: data.message, success: true });
+      toast({
+        title: data.success ? "Success" : "Error",
+        description: data.message,
+        variant: data.success ? "default" : "destructive"
+      });
       setManualCode("");
     } catch (error: any) {
-      setResult({ type: 'manual', message: error.message || 'Failed to process manual code.', success: false });
+      toast({
+        title: "Error",
+        description: error.message || 'Failed to process manual code.',
+        variant: "destructive"
+      });
     } finally {
       setManualSubmitting(false);
     }
@@ -218,13 +224,6 @@ export default function ScanPage() {
               )}
             </CardContent>
           </Card>
-
-          {result && (
-            <Alert variant={result.success ? "default" : "destructive"}>
-              <CheckCircle className="h-4 w-4" />
-              <AlertDescription>{result.message}</AlertDescription>
-            </Alert>
-          )}
 
           <Card>
             <CardHeader>
