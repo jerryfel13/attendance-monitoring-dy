@@ -13,7 +13,7 @@ async function testEnrollment() {
     console.log('QR Code:', testData.qrCode);
     console.log('Student ID:', testData.studentId);
     
-    const response = await fetch('http://localhost:4000/api/auth/scan', {
+    const response = await fetch('https://hospitable-essence.railway.app/api/auth/scan', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -40,7 +40,7 @@ async function testEnrollment() {
 // Check if backend is running
 async function checkBackend() {
   try {
-    const response = await fetch('http://localhost:4000/api/health');
+    const response = await fetch('https://hospitable-essence.railway.app/api/health');
     const result = await response.json();
     console.log('Backend status:', result);
     return true;

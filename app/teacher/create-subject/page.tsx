@@ -61,7 +61,7 @@ export default function CreateSubjectPage() {
       }
       const user = JSON.parse(userData)
 
-      const res = await fetch("http://localhost:4000/api/auth/subjects", {
+      const res = await fetch("https://hospitable-essence.railway.app/api/auth/subjects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

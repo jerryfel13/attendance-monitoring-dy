@@ -40,7 +40,7 @@ export default function TeacherDashboard() {
     setUser(parsedUser)
 
     // Fetch real subjects data from backend
-    fetch(`http://localhost:4000/api/auth/teacher/subjects?teacherId=${parsedUser.id}`)
+    fetch(`https://hospitable-essence.railway.app/api/auth/teacher/subjects?teacherId=${parsedUser.id}`)
       .then(res => res.json())
       .then(data => {
         setSubjects(data.subjects || [])

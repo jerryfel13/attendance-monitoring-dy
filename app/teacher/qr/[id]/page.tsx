@@ -28,7 +28,7 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
       return
     }
     // Fetch subject from backend
-    fetch(`http://localhost:4000/api/auth/subjects/${id}`)
+    fetch(`https://hospitable-essence.railway.app/api/auth/subjects/${id}`)
       .then(res => res.json())
       .then(data => {
         setSubject(data.subject)
@@ -43,7 +43,7 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
 
   const checkActiveSession = async () => {
     try {
-      const response = await fetch(`http://localhost:4000/api/auth/subjects/${id}/sessions/active`)
+      const response = await fetch(`https://hospitable-essence.railway.app/api/auth/subjects/${id}/sessions/active`)
       if (response.ok) {
         const data = await response.json()
         if (data.session) {
@@ -76,7 +76,7 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
       const qrData = `ATTENDANCE:${subject.name} (${subject.code}) - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`
       setAttendanceQR(qrData)
       
-      const response = await fetch(`http://localhost:4000/api/auth/subjects/${id}/sessions`, {
+      const response = await fetch(`https://hospitable-essence.railway.app/api/auth/subjects/${id}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -104,7 +104,7 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
     if (!sessionId) return
     
     try {
-      const response = await fetch(`http://localhost:4000/api/auth/sessions/${sessionId}/stop`, {
+      const response = await fetch(`https://hospitable-essence.railway.app/api/auth/sessions/${sessionId}/stop`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' }
       })

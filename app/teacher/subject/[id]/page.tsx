@@ -56,7 +56,7 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
     }
 
     // Fetch subject details
-    fetch(`http://localhost:4000/api/auth/subjects/${id}`)
+    fetch(`https://hospitable-essence.railway.app/api/auth/subjects/${id}`)
       .then(res => res.json())
       .then(data => {
         setSubject(data.subject)
@@ -67,7 +67,7 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
       })
 
     // Fetch students for this subject
-    fetch(`http://localhost:4000/api/auth/subjects/${id}/students`)
+    fetch(`https://hospitable-essence.railway.app/api/auth/subjects/${id}/students`)
       .then(res => res.json())
       .then(data => {
         setStudents(data.students || [])
@@ -75,7 +75,7 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
       .catch(() => setStudents([]))
 
     // Fetch attendance sessions
-    fetch(`http://localhost:4000/api/auth/subjects/${id}/sessions`)
+    fetch(`https://hospitable-essence.railway.app/api/auth/subjects/${id}/sessions`)
       .then(res => res.json())
       .then(data => {
         setSessions(data.sessions || [])

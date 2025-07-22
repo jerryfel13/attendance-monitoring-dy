@@ -92,7 +92,7 @@ export default function ScanPage() {
 
     try {
       // Send QR code data to backend for processing
-      const response = await fetch("http://localhost:4000/api/auth/scan", {
+      const response = await fetch("https://hospitable-essence.railway.app/api/auth/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
