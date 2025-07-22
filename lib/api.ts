@@ -57,6 +57,10 @@ export const apiClient = {
       body: JSON.stringify(data),
     }),
     getSessionAttendance: (sessionId: string) => apiClient.request(`/auth?route=session-attendance&sessionId=${sessionId}`),
+    removeStudentFromSubject: (data: { subjectId: string, studentId: string }) => apiClient.request('/auth?route=remove-student-from-subject', {
+      method: 'DELETE',
+      body: JSON.stringify(data),
+    }),
   },
   teacher: {
     getSubjects: (teacherId: string) => apiClient.request(`/subjects?route=teacher-subjects&teacherId=${teacherId}`),

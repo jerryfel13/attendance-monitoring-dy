@@ -56,7 +56,7 @@ export default function TeacherDashboard() {
   if (!user) return null
 
   const totalStudents = subjects.reduce((acc, s) => acc + s.students, 0)
-  const avgAttendance = Math.round(subjects.reduce((acc, s) => acc + s.attendanceRate, 0) / subjects.length)
+  const avgAttendance = subjects.length > 0 ? Math.round(subjects.reduce((acc, s) => acc + (isNaN(s.attendanceRate) ? 0 : s.attendanceRate), 0) / subjects.length) : 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -106,7 +106,7 @@ export default function TeacherDashboard() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{avgAttendance}%</div>
+              <div className="text-2xl font-bold">{isNaN(avgAttendance) ? 0 : avgAttendance}%</div>
             </CardContent>
           </Card>
 
@@ -143,8 +143,8 @@ export default function TeacherDashboard() {
                       <CardTitle className="text-lg">{subject.name}</CardTitle>
                       <CardDescription>{subject.code}</CardDescription>
                     </div>
-                    <Badge variant={subject.attendanceRate >= 80 ? "default" : "destructive"}>
-                      {subject.attendanceRate}%
+                    <Badge variant={typeof subject.attendanceRate === 'number' && !isNaN(subject.attendanceRate) && subject.attendanceRate >= 80 ? "default" : "destructive"}>
+                      {typeof subject.attendanceRate === 'number' && !isNaN(subject.attendanceRate) ? `${subject.attendanceRate}%` : '-'}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -168,7 +168,7 @@ export default function TeacherDashboard() {
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
                       className={`h-2 rounded-full ${subject.attendanceRate >= 80 ? "bg-green-600" : "bg-red-600"}`}
-                      style={{ width: `${subject.attendanceRate}%` }}
+                      style={{ width: `${typeof subject.attendanceRate === 'number' && !isNaN(subject.attendanceRate) ? subject.attendanceRate : 0}%` }}
                     ></div>
                   </div>
 

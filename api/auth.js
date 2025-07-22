@@ -418,6 +418,23 @@ export default async function handler(req, res) {
     }
   }
 
+  // Remove student from subject (teacher)
+  if (route === 'remove-student-from-subject' && req.method === 'DELETE') {
+    const { subjectId, studentId } = req.body;
+    if (!subjectId || !studentId) {
+      return res.status(400).json({ error: 'Missing subjectId or studentId' });
+    }
+    try {
+      await pool.query(
+        'DELETE FROM enrollments WHERE subject_id = $1 AND student_id = $2',
+        [subjectId, studentId]
+      );
+      return res.json({ message: 'Student removed from subject.' });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to remove student', details: err.message });
+    }
+  }
+
   // Default: Not found
   return res.status(404).json({ error: 'Not found' });
 } 

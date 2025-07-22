@@ -52,6 +52,7 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
   const [selectedAttendanceSessionId, setSelectedAttendanceSessionId] = useState<string>("");
   const [sessionAttendance, setSessionAttendance] = useState<any[]>([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [removingStudentId, setRemovingStudentId] = useState<number | null>(null);
 
   useEffect(() => {
     const userData = localStorage.getItem("user")
@@ -128,6 +129,18 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
       setAttendanceUpdateResult((prev) => ({ ...prev, [studentId]: err.message || "Error" }));
     } finally {
       setAttendanceUpdateLoading((prev) => ({ ...prev, [studentId]: false }));
+    }
+  };
+
+  const handleRemoveStudent = async (studentId: number) => {
+    setRemovingStudentId(studentId);
+    try {
+      await apiClient.auth.removeStudentFromSubject({ subjectId: id, studentId: String(studentId) });
+      setStudents((prev) => prev.filter((s) => s.id !== studentId));
+    } catch (err) {
+      // Optionally show error
+    } finally {
+      setRemovingStudentId(null);
     }
   };
 
@@ -302,6 +315,7 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
                       <TableHead>Late</TableHead>
                       <TableHead>Absent</TableHead>
                       <TableHead>Manual Update</TableHead>
+                      <TableHead>Remove</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -348,6 +362,16 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
                               <span className="text-xs text-green-600">{attendanceUpdateResult[student.id]}</span>
                             )}
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            disabled={removingStudentId === student.id}
+                            onClick={() => handleRemoveStudent(student.id)}
+                          >
+                            {removingStudentId === student.id ? "Removing..." : "Remove"}
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
