@@ -76,8 +76,8 @@ app.use(express.json());
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     message: 'Attendance API is running',
     cors: {
       allowedOrigins: allowedOrigins,
