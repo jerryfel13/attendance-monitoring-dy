@@ -14,6 +14,7 @@ const allowedOrigins = [
   'http://localhost:5173',
   'https://v0-attendance-system-design-eight.vercel.app',
   'https://attendance-system-design-eight.vercel.app',
+  'https://v0-attendance-system-design-4n37oqnku-jerryfel13s-projects.vercel.app',
   'https://*.vercel.app',
   'https://*.railway.app',
   'https://railway.com',
