@@ -1,0 +1,14 @@
+# Railway Nixpacks Configuration
+# Forces npm usage and proper build process
+
+[phases.setup]
+nixPkgs = ["nodejs", "npm"]
+
+[phases.install]
+cmds = ["npm ci --only=production"]
+
+[phases.build]
+cmds = ["echo 'Build completed'"]
+
+[start]
+cmd = "npm start" 
