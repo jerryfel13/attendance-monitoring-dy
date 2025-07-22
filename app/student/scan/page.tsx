@@ -185,30 +185,14 @@ export default function ScanPage() {
               <div id="qr-reader" className={isCameraActive ? "w-full" : "hidden"}></div>
               {!isCameraActive ? (
                 <>
-                  <div className="space-y-2">
-                    <Label htmlFor="qrCode">QR Code Data</Label>
-                    <Input
-                      id="qrCode"
-                      placeholder="Enter QR code or scan with camera"
-                      value={qrCode}
-                      onChange={(e) => setQrCode(e.target.value)}
-                    />
-                  </div>
-
+                  {/* Remove QR Code Data input and Simulate Scan button */}
                   <div className="flex space-x-2">
                     <Button onClick={startCamera} className="flex-1">
                       <Camera className="w-4 h-4 mr-2" />
                       Start Camera
                     </Button>
-                    <Button onClick={simulateCamera} variant="outline" className="flex-1 bg-transparent">
-                      Simulate Scan
-                    </Button>
                   </div>
-
-                  <Button onClick={() => handleScan()} disabled={!qrCode.trim() || isScanning} className="w-full">
-                    {isScanning ? "Processing..." : "Process QR"}
-                  </Button>
-
+                  {/* Manual code input remains */}
                   <div className="space-y-2">
                     <Label htmlFor="manualCode">Manual Attendance Code</Label>
                     <Input
