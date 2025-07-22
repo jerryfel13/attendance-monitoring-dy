@@ -4,6 +4,17 @@ import bcrypt from 'bcrypt';
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 export default async function handler(req, res) {
+  // Set CORS headers for all responses
+  res.setHeader('Access-Control-Allow-Origin', 'https://v0-attendance-system-design-eight.vercel.app');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  // Handle preflight OPTIONS request
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
   const { route } = req.query;
 
   // REGISTER

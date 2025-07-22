@@ -164,6 +164,8 @@ export default function ScanPage() {
               <CardDescription>Point your camera at the QR code or enter the code manually</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Always render the qr-reader div, but only show it when camera is active */}
+              <div id="qr-reader" className={isCameraActive ? "w-full" : "hidden"}></div>
               {!isCameraActive ? (
                 <>
                   <div className="space-y-2">
@@ -192,7 +194,7 @@ export default function ScanPage() {
                 </>
               ) : (
                 <div className="space-y-4">
-                  <div id="qr-reader" className="w-full"></div>
+                  {/* The qr-reader div is always present, so nothing needed here */}
                   <Button onClick={stopCamera} variant="outline" className="w-full">
                     <X className="w-4 h-4 mr-2" />
                     Stop Camera

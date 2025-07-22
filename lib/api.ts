@@ -1,5 +1,8 @@
 // API Configuration
-const API_BASE_URL = '/api'; // Use relative path for Vercel serverless
+const API_BASE_URL =
+  typeof window !== 'undefined' && process.env.NODE_ENV === 'development'
+    ? process.env.NEXT_PUBLIC_API_BASE_URL || 'https://v0-attendance-system-design-eight.vercel.app/api'
+    : '/api'; // Use relative path for Vercel serverless
 
 export const apiClient = {
   async request(endpoint: string, options: RequestInit = {}) {
