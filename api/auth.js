@@ -40,6 +40,7 @@ export default async function handler(req, res) {
     }
   }
 
+  
   // LOGIN
   if (route === 'login' && req.method === 'POST') {
     const { email, password } = req.body;
