@@ -87,6 +87,15 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Root route for testing
+app.get('/', (req, res) => {
+  res.json({
+    status: 'OK',
+    message: 'Root route working',
+    time: new Date().toISOString()
+  });
+});
+
 // API routes
 app.use('/api/auth', authRoutes);
 
