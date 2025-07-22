@@ -343,6 +343,37 @@ export default async function handler(req, res) {
     }
   }
 
+  // Manual attendance update (teacher)
+  if (route === 'manual-attendance-update' && req.method === 'POST') {
+    const { sessionId, studentId, status } = req.body;
+    if (!sessionId || !studentId || !['present', 'late', 'absent'].includes(status)) {
+      return res.status(400).json({ error: 'Missing or invalid sessionId, studentId, or status' });
+    }
+    try {
+      // Check if record exists
+      const result = await pool.query(
+        'SELECT id FROM attendance_records WHERE session_id = $1 AND student_id = $2',
+        [sessionId, studentId]
+      );
+      if (result.rows.length > 0) {
+        // Update existing record
+        await pool.query(
+          'UPDATE attendance_records SET status = $1 WHERE session_id = $2 AND student_id = $3',
+          [status, sessionId, studentId]
+        );
+      } else {
+        // Insert new record
+        await pool.query(
+          'INSERT INTO attendance_records (session_id, student_id, status, check_in_time) VALUES ($1, $2, $3, NOW())',
+          [sessionId, studentId, status]
+        );
+      }
+      return res.json({ message: 'Attendance updated successfully.' });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to update attendance', details: err.message });
+    }
+  }
+
   // STOP SESSION: Mark absent if not scanned out
   if (route === 'stop-session' && req.method === 'PUT') {
     const { sessionId } = req.query;
@@ -363,6 +394,27 @@ export default async function handler(req, res) {
       return res.json({ message: 'Session stopped. Absentees marked for students who did not scan out.' });
     } catch (err) {
       return res.status(500).json({ error: 'Failed to stop session', details: err.message });
+    }
+  }
+
+  // Get attendance for a specific session
+  if (route === 'session-attendance' && req.method === 'GET') {
+    const { sessionId } = req.query;
+    if (!sessionId) {
+      return res.status(400).json({ error: 'Missing sessionId' });
+    }
+    try {
+      const result = await pool.query(`
+        SELECT u.id, u.name, u.email, u.student_id, ar.status, ar.check_in_time, ar.check_out_time
+        FROM enrollments e
+        JOIN users u ON e.student_id = u.id
+        LEFT JOIN attendance_records ar ON ar.session_id = $1 AND ar.student_id = u.id
+        WHERE e.subject_id = (SELECT subject_id FROM attendance_sessions WHERE id = $1)
+        ORDER BY u.name
+      `, [sessionId]);
+      return res.json({ students: result.rows });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to fetch session attendance', details: err.message });
     }
   }
 

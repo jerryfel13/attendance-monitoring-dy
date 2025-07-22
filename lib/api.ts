@@ -52,6 +52,11 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+    manualAttendanceUpdate: (data: { sessionId: string, studentId: string, status: 'present' | 'late' | 'absent' }) => apiClient.request('/auth?route=manual-attendance-update', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    getSessionAttendance: (sessionId: string) => apiClient.request(`/auth?route=session-attendance&sessionId=${sessionId}`),
   },
   teacher: {
     getSubjects: (teacherId: string) => apiClient.request(`/subjects?route=teacher-subjects&teacherId=${teacherId}`),

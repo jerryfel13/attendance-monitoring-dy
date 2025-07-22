@@ -11,6 +11,10 @@ import { ArrowLeft, Users, Clock, Calendar, TrendingUp, AlertTriangle, User, Log
 import Link from "next/link"
 import { Label } from "@/components/ui/label"
 import { apiClient } from "@/lib/api"
+import { Select } from "@/components/ui/select"
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 
 interface Student {
   id: number
@@ -42,6 +46,12 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
   const [sessions, setSessions] = useState<AttendanceSession[]>([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
+  const [selectedSessionId, setSelectedSessionId] = useState<string>("");
+  const [attendanceUpdateLoading, setAttendanceUpdateLoading] = useState<{ [key: number]: boolean }>({});
+  const [attendanceUpdateResult, setAttendanceUpdateResult] = useState<{ [key: number]: string }>({});
+  const [selectedAttendanceSessionId, setSelectedAttendanceSessionId] = useState<string>("");
+  const [sessionAttendance, setSessionAttendance] = useState<any[]>([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem("user")
@@ -81,9 +91,75 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
       .catch(() => setSessions([]))
   }, [id, router])
 
+  useEffect(() => {
+    if (selectedAttendanceSessionId) {
+      setAttendanceLoading(true);
+      apiClient.auth.getSessionAttendance(selectedAttendanceSessionId)
+        .then(data => {
+          setSessionAttendance(data.students || []);
+          setAttendanceLoading(false);
+        })
+        .catch(() => {
+          setSessionAttendance([]);
+          setAttendanceLoading(false);
+        });
+    } else {
+      setSessionAttendance([]);
+    }
+  }, [selectedAttendanceSessionId]);
+
   const handleLogout = () => {
     localStorage.removeItem("user")
     router.push("/")
+  }
+
+  const handleManualAttendanceUpdate = async (studentId: number, status: 'present' | 'late' | 'absent') => {
+    if (!selectedSessionId) return;
+    setAttendanceUpdateLoading((prev) => ({ ...prev, [studentId]: true }));
+    setAttendanceUpdateResult((prev) => ({ ...prev, [studentId]: "" }));
+    try {
+      await apiClient.auth.manualAttendanceUpdate({
+        sessionId: selectedSessionId,
+        studentId: String(studentId),
+        status,
+      });
+      setAttendanceUpdateResult((prev) => ({ ...prev, [studentId]: "Updated!" }));
+    } catch (err: any) {
+      setAttendanceUpdateResult((prev) => ({ ...prev, [studentId]: err.message || "Error" }));
+    } finally {
+      setAttendanceUpdateLoading((prev) => ({ ...prev, [studentId]: false }));
+    }
+  };
+
+  function exportAttendanceToExcel() {
+    const ws = XLSX.utils.json_to_sheet(sessionAttendance.map((s: any) => ({
+      Name: s.name,
+      "Student ID": s.student_id,
+      Email: s.email,
+      Status: s.status || "-",
+      "Check In": s.check_in_time ? new Date(s.check_in_time).toLocaleTimeString() : "-",
+      "Check Out": s.check_out_time ? new Date(s.check_out_time).toLocaleTimeString() : "-",
+    })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+    XLSX.writeFile(wb, `attendance_session_${selectedAttendanceSessionId}.xlsx`);
+  }
+  function exportAttendanceToPDF() {
+    const doc = new jsPDF();
+    doc.text("Attendance Report", 14, 16);
+    (doc as any).autoTable({
+      head: [["Name", "Student ID", "Email", "Status", "Check In", "Check Out"]],
+      body: sessionAttendance.map((s: any) => [
+        s.name,
+        s.student_id,
+        s.email,
+        s.status || "-",
+        s.check_in_time ? new Date(s.check_in_time).toLocaleTimeString() : "-",
+        s.check_out_time ? new Date(s.check_out_time).toLocaleTimeString() : "-",
+      ]),
+      startY: 22,
+    });
+    doc.save(`attendance_session_${selectedAttendanceSessionId}.pdf`);
   }
 
   if (loading) {
@@ -197,6 +273,22 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
               <CardHeader>
                 <CardTitle>Enrolled Students</CardTitle>
                 <CardDescription>List of all students enrolled in this subject</CardDescription>
+                <div className="mt-4">
+                  <Label>Select Session for Manual Attendance Update</Label>
+                  <select
+                    className="border rounded px-2 py-1 ml-2"
+                    value={selectedSessionId}
+                    onChange={e => setSelectedSessionId(e.target.value)}
+                  >
+                    <option value="">-- Select Session --</option>
+                    {sessions.map((session) => (
+                      <option key={session.id} value={session.id}>
+                        {new Date(session.session_date).toLocaleDateString()} {session.session_time}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="ml-2 text-xs text-gray-500">(Choose a session to enable manual update)</span>
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -209,6 +301,7 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
                       <TableHead>Present</TableHead>
                       <TableHead>Late</TableHead>
                       <TableHead>Absent</TableHead>
+                      <TableHead>Manual Update</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -225,6 +318,37 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
                         <TableCell>{student.present_sessions}</TableCell>
                         <TableCell>{student.late_sessions}</TableCell>
                         <TableCell>{student.absent_sessions}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={!selectedSessionId || attendanceUpdateLoading[student.id]}
+                              onClick={() => handleManualAttendanceUpdate(student.id, "present")}
+                            >
+                              Present
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={!selectedSessionId || attendanceUpdateLoading[student.id]}
+                              onClick={() => handleManualAttendanceUpdate(student.id, "late")}
+                            >
+                              Late
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={!selectedSessionId || attendanceUpdateLoading[student.id]}
+                              onClick={() => handleManualAttendanceUpdate(student.id, "absent")}
+                            >
+                              Absent
+                            </Button>
+                            {attendanceUpdateResult[student.id] && (
+                              <span className="text-xs text-green-600">{attendanceUpdateResult[student.id]}</span>
+                            )}
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -238,38 +362,60 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
               <CardHeader>
                 <CardTitle>Attendance Sessions</CardTitle>
                 <CardDescription>History of all attendance sessions for this subject</CardDescription>
+                <div className="mt-4">
+                  <Label>Select Session to View Attendance</Label>
+                  <select
+                    className="border rounded px-2 py-1 ml-2"
+                    value={selectedAttendanceSessionId}
+                    onChange={e => setSelectedAttendanceSessionId(e.target.value)}
+                  >
+                    <option value="">-- Select Session --</option>
+                    {sessions.map((session) => (
+                      <option key={session.id} value={session.id}>
+                        {new Date(session.session_date).toLocaleDateString()} {session.session_time}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="ml-2 text-xs text-gray-500">(Choose a session to view and export attendance)</span>
+                </div>
+                {sessionAttendance.length > 0 && (
+                  <div className="flex gap-2 mt-4">
+                    <Button onClick={exportAttendanceToExcel} variant="outline">Export to Excel</Button>
+                    <Button onClick={exportAttendanceToPDF} variant="outline">Export to PDF</Button>
+                  </div>
+                )}
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Total Students</TableHead>
-                      <TableHead>Present</TableHead>
-                      <TableHead>Late</TableHead>
-                      <TableHead>Absent</TableHead>
-                      <TableHead>Attendance Rate</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sessions.map((session) => (
-                      <TableRow key={session.id}>
-                        <TableCell>{new Date(session.session_date).toLocaleDateString()}</TableCell>
-                        <TableCell>{session.session_time}</TableCell>
-                        <TableCell>{session.total_students}</TableCell>
-                        <TableCell>{session.present_count}</TableCell>
-                        <TableCell>{session.late_count}</TableCell>
-                        <TableCell>{session.absent_count}</TableCell>
-                        <TableCell>
-                          <Badge variant={session.attendance_rate >= 80 ? "default" : "destructive"}>
-                            {session.attendance_rate}%
-                          </Badge>
-                        </TableCell>
+                {attendanceLoading ? (
+                  <div className="text-center text-gray-500">Loading attendance...</div>
+                ) : sessionAttendance.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Student ID</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Check In</TableHead>
+                        <TableHead>Check Out</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {sessionAttendance.map((student) => (
+                        <TableRow key={student.id}>
+                          <TableCell>{student.name}</TableCell>
+                          <TableCell>{student.student_id}</TableCell>
+                          <TableCell>{student.email}</TableCell>
+                          <TableCell>{student.status || "-"}</TableCell>
+                          <TableCell>{student.check_in_time ? new Date(student.check_in_time).toLocaleTimeString() : "-"}</TableCell>
+                          <TableCell>{student.check_out_time ? new Date(student.check_out_time).toLocaleTimeString() : "-"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : selectedAttendanceSessionId ? (
+                  <div className="text-center text-gray-500">No attendance records for this session.</div>
+                ) : null}
               </CardContent>
             </Card>
           </TabsContent>
