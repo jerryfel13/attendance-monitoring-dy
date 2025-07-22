@@ -54,6 +54,35 @@ export default async function handler(req, res) {
     }
   }
 
+  // Get subjects for a student
+  if (route === 'student-subjects' && req.method === 'GET') {
+    const { studentId } = req.query;
+    if (!studentId) return res.status(400).json({ error: 'Missing studentId' });
+    try {
+      const subjectsResult = await pool.query(
+        `SELECT s.id, s.name, s.code, s.start_time, s.end_time, s.schedule_days, s.teacher_id, u.name as teacher_name
+         FROM subjects s
+         JOIN enrollments e ON s.id = e.subject_id
+         JOIN users u ON s.teacher_id = u.id
+         WHERE e.student_id = $1`,
+        [studentId]
+      );
+      const subjects = subjectsResult.rows.map(subject => ({
+        id: subject.id,
+        name: subject.name,
+        code: subject.code,
+        teacher: subject.teacher_name,
+        schedule: subject.schedule_days && subject.start_time && subject.end_time
+          ? `${subject.schedule_days.join(', ')} ${subject.start_time} - ${subject.end_time}`
+          : '',
+        enrolled: true,
+      }));
+      return res.json({ subjects });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to fetch student subjects', details: err.message });
+    }
+  }
+
   // Create a new subject
   if (route === 'create' && req.method === 'POST') {
     const { name, code, description, teacher_id, schedule_days, start_time, end_time, late_threshold } = req.body;
