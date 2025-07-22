@@ -114,6 +114,28 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
     router.push("/")
   }
 
+  // Helper to refetch students, sessions, and session attendance
+  const refetchAll = () => {
+    apiClient.teacher.getSubjectStudents(id)
+      .then(data => setStudents(data.students || []))
+      .catch(() => setStudents([]));
+    apiClient.teacher.getSubjectSessions(id)
+      .then(data => setSessions(data.sessions || []))
+      .catch(() => setSessions([]));
+    if (selectedAttendanceSessionId) {
+      setAttendanceLoading(true);
+      apiClient.auth.getSessionAttendance(selectedAttendanceSessionId)
+        .then(data => {
+          setSessionAttendance(data.students || []);
+          setAttendanceLoading(false);
+        })
+        .catch(() => {
+          setSessionAttendance([]);
+          setAttendanceLoading(false);
+        });
+    }
+  };
+
   const handleManualAttendanceUpdate = async (studentId: number, status: 'present' | 'late' | 'absent') => {
     if (!selectedSessionId) return;
     setAttendanceUpdateLoading((prev) => ({ ...prev, [studentId]: true }));
@@ -125,6 +147,7 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
         status,
       });
       setAttendanceUpdateResult((prev) => ({ ...prev, [studentId]: "Updated!" }));
+      refetchAll();
     } catch (err: any) {
       setAttendanceUpdateResult((prev) => ({ ...prev, [studentId]: err.message || "Error" }));
     } finally {
@@ -136,7 +159,7 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
     setRemovingStudentId(studentId);
     try {
       await apiClient.auth.removeStudentFromSubject({ subjectId: id, studentId: String(studentId) });
-      setStudents((prev) => prev.filter((s) => s.id !== studentId));
+      refetchAll();
     } catch (err) {
       // Optionally show error
     } finally {
