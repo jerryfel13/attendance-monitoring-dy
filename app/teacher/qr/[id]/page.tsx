@@ -1,7 +1,7 @@
 "use client"
 
 import { Label } from "@/components/ui/label"
-import { use, useState, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,9 +10,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowLeft, QrCode, Download, RefreshCw, Copy, CheckCircle } from "lucide-react"
 import Link from "next/link"
 import QRCode from 'react-qr-code'
+import { apiClient } from "@/lib/api"
 
 export default function QRManagementPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use<{ id: string }>(params)
+  const [id, setId] = useState<string>("");
   const [subject, setSubject] = useState<any>(null)
   const [enrollmentQR, setEnrollmentQR] = useState("")
   const [attendanceQR, setAttendanceQR] = useState("")
@@ -22,34 +23,36 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
   const router = useRouter()
 
   useEffect(() => {
+    (async () => {
+      const resolvedParams = await params;
+      setId(resolvedParams.id);
+    })();
+  }, [params]);
+
+  useEffect(() => {
     const userData = localStorage.getItem("user")
     if (!userData) {
       router.push("/auth/login")
       return
     }
     // Fetch subject from backend
-    fetch(`https://hospitable-essence.railway.app/api/auth/subjects/${id}`)
-      .then(res => res.json())
+    apiClient.teacher.getSubject(id)
       .then(data => {
         setSubject(data.subject)
         setEnrollmentQR(`SUBJECT:${data.subject.name} (${data.subject.code})`)
         setAttendanceQR(`ATTENDANCE:${data.subject.name} (${data.subject.code}) - ${new Date().toLocaleDateString()}`)
       })
       .catch(() => setSubject(null))
-    
     // Check for active session
     checkActiveSession()
   }, [id, router])
 
   const checkActiveSession = async () => {
     try {
-      const response = await fetch(`https://hospitable-essence.railway.app/api/auth/subjects/${id}/sessions/active`)
-      if (response.ok) {
-        const data = await response.json()
-        if (data.session) {
-          setSessionActive(true)
-          setSessionId(data.session.id)
-        }
+      const data = await apiClient.teacher.getActiveSession(id)
+      if (data.session) {
+        setSessionActive(true)
+        setSessionId(data.session.id)
       }
     } catch (error) {
       console.error('Error checking active session:', error)
@@ -75,20 +78,13 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
     try {
       const qrData = `ATTENDANCE:${subject.name} (${subject.code}) - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`
       setAttendanceQR(qrData)
-      
-      const response = await fetch(`https://hospitable-essence.railway.app/api/auth/subjects/${id}/sessions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session_date: new Date().toISOString().split('T')[0],
-          session_time: new Date().toLocaleTimeString(),
-          is_active: true,
-          attendance_qr: qrData
-        })
+      const data = await apiClient.teacher.startSession(id, {
+        session_date: new Date().toISOString().split('T')[0],
+        session_time: new Date().toLocaleTimeString(),
+        is_active: true,
+        attendance_qr: qrData
       })
-      
-      if (response.ok) {
-        const data = await response.json()
+      if (data && data.session) {
         setSessionActive(true)
         setSessionId(data.session.id)
         console.log('Attendance session started successfully')
@@ -102,14 +98,9 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
 
   const stopAttendanceSession = async () => {
     if (!sessionId) return
-    
     try {
-      const response = await fetch(`https://hospitable-essence.railway.app/api/auth/sessions/${sessionId}/stop`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' }
-      })
-      
-      if (response.ok) {
+      const data = await apiClient.teacher.stopSession(String(sessionId))
+      if (data) {
         setSessionActive(false)
         setSessionId(null)
         console.log('Attendance session stopped successfully')

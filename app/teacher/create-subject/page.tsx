@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ArrowLeft, QrCode, CheckCircle } from "lucide-react"
 import Link from "next/link"
+import { apiClient } from "@/lib/api"
 
 export default function CreateSubjectPage() {
   const [formData, setFormData] = useState({
@@ -61,23 +62,18 @@ export default function CreateSubjectPage() {
       }
       const user = JSON.parse(userData)
 
-      const res = await fetch("https://hospitable-essence.railway.app/api/auth/subjects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: formData.name,
-          code: formData.code,
-          description: formData.description,
-          teacher_id: user.id,
-          schedule_days: formData.days,
-          start_time: formData.startTime,
-          end_time: formData.endTime,
-          late_threshold: parseInt(formData.lateThreshold),
-        }),
+      const data = await apiClient.teacher.createSubject({
+        name: formData.name,
+        code: formData.code,
+        description: formData.description,
+        teacher_id: user.id,
+        schedule_days: formData.days,
+        start_time: formData.startTime,
+        end_time: formData.endTime,
+        late_threshold: parseInt(formData.lateThreshold),
       })
-      const data = await res.json()
-      if (!res.ok) {
-        console.error("Failed to create subject:", data.error)
+      if (!data || !data.subject) {
+        console.error("Failed to create subject:", data?.error)
         return
       }
 

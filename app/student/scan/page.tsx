@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Camera, QrCode, ArrowLeft, CheckCircle, X } from "lucide-react"
 import Link from "next/link"
 import { Html5QrcodeScanner } from "html5-qrcode"
+import { apiClient } from "@/lib/api"
 
 export default function ScanPage() {
   const [qrCode, setQrCode] = useState("")
@@ -91,40 +92,23 @@ export default function ScanPage() {
     setResult(null)
 
     try {
-      // Send QR code data to backend for processing
-      const response = await fetch("https://hospitable-essence.railway.app/api/auth/scan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          qrCode: dataToProcess,
-          studentId: user?.id,
-        }),
+      // Use the new apiClient route
+      const data = await apiClient.auth.scan({
+        qrCode: dataToProcess,
+        studentId: user?.id,
       })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        setResult({
-          type: data.type,
-          message: data.message,
-          success: true,
-        })
-        
-        // Stop camera after successful scan
-        if (isCameraActive) {
-          stopCamera()
-        }
-      } else {
-        setResult({
-          type: "error",
-          message: data.error || "Failed to process QR code",
-          success: false,
-        })
+      setResult({
+        type: data.type,
+        message: data.message,
+        success: data.success,
+      })
+      if (isCameraActive && data.success) {
+        stopCamera()
       }
-    } catch (error) {
+    } catch (error: any) {
       setResult({
         type: "error",
-        message: "Failed to process QR code. Please try again.",
+        message: error.message || "Failed to process QR code. Please try again.",
         success: false,
       })
     } finally {

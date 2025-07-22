@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE_URL = '/api/auth'; // Use relative path for Vercel serverless
+const API_BASE_URL = '/api'; // Use relative path for Vercel serverless
 
 export const apiClient = {
   async request(endpoint: string, options: RequestInit = {}) {
@@ -29,39 +29,43 @@ export const apiClient = {
     }
   },
   auth: {
-    register: (data: any) => apiClient.request('/register', {
+    register: (data: any) => apiClient.request('/auth?route=register', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-    login: (data: any) => apiClient.request('/login', {
+    login: (data: any) => apiClient.request('/auth?route=login', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-    scan: (data: any) => apiClient.request('/scan', {
+    scan: (data: any) => apiClient.request('/auth?route=scan', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   },
   teacher: {
-    getSubjects: (teacherId: string) => apiClient.request(`/teacher-subjects?teacherId=${teacherId}`),
-    createSubject: (data: any) => apiClient.request('/subjects', {
+    getSubjects: (teacherId: string) => apiClient.request(`/subjects?route=teacher-subjects&teacherId=${teacherId}`),
+    createSubject: (data: any) => apiClient.request('/subjects?route=create', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-    getSubject: (id: string) => apiClient.request(`/subjects-${id}`),
-    getSubjectStudents: (id: string) => apiClient.request(`/subjects-${id}-students`),
-    getSubjectSessions: (id: string) => apiClient.request(`/subjects-${id}-sessions`),
-    startSession: (id: string, data: any) => apiClient.request(`/subjects-${id}-sessions`, {
+    getSubject: (id: string) => apiClient.request(`/subjects?route=get&id=${id}`),
+    getSubjectStudents: (id: string) => apiClient.request(`/subjects?route=students&id=${id}`),
+    getSubjectSessions: (id: string) => apiClient.request(`/subjects?route=sessions&id=${id}`),
+    startSession: (id: string, data: any) => apiClient.request(`/subjects?route=create-session&id=${id}`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-    stopSession: (sessionId: string) => apiClient.request(`/sessions-${sessionId}-stop`, {
+    stopSession: (sessionId: string) => apiClient.request(`/sessions?route=stop&id=${sessionId}`, {
       method: 'PUT',
     }),
-    getActiveSession: (id: string) => apiClient.request(`/subjects-${id}-sessions-active`),
+    getActiveSession: (id: string) => apiClient.request(`/subjects?route=active-session&id=${id}`),
   },
   student: {
-    getSubjects: (studentId: string) => apiClient.request(`/student-subjects?studentId=${studentId}`),
+    getSubjects: (studentId: string) => apiClient.request(`/subjects?route=student-subjects&studentId=${studentId}`),
+  },
+  records: {
+    getEnrollments: () => apiClient.request('/records?route=enrollments'),
+    getAttendanceRecords: () => apiClient.request('/records?route=attendance-records'),
   },
 };
 

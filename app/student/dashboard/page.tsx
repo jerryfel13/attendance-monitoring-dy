@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { QrCode, Clock, BookOpen, User, LogOut, Camera } from "lucide-react"
 import Link from "next/link"
+import { apiClient } from "@/lib/api"
 
 interface Subject {
   id: string
@@ -39,8 +40,7 @@ export default function StudentDashboard() {
     setUser(parsedUser)
 
     // Fetch real subjects data from backend
-    fetch(`https://hospitable-essence.railway.app/api/auth/student/subjects?studentId=${parsedUser.id}`)
-      .then(res => res.json())
+    apiClient.student.getSubjects(parsedUser.id)
       .then(data => {
         setSubjects(data.subjects || [])
       })

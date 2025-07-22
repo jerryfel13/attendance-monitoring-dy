@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, Users, Clock, Calendar, TrendingUp, AlertTriangle, User, LogOut, QrCode } from "lucide-react"
 import Link from "next/link"
 import { Label } from "@/components/ui/label"
+import { apiClient } from "@/lib/api"
 
 interface Student {
   id: number
@@ -56,8 +57,7 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
     }
 
     // Fetch subject details
-    fetch(`https://hospitable-essence.railway.app/api/auth/subjects/${id}`)
-      .then(res => res.json())
+    apiClient.teacher.getSubject(id)
       .then(data => {
         setSubject(data.subject)
         setLoading(false)
@@ -67,16 +67,14 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
       })
 
     // Fetch students for this subject
-    fetch(`https://hospitable-essence.railway.app/api/auth/subjects/${id}/students`)
-      .then(res => res.json())
+    apiClient.teacher.getSubjectStudents(id)
       .then(data => {
         setStudents(data.students || [])
       })
       .catch(() => setStudents([]))
 
     // Fetch attendance sessions
-    fetch(`https://hospitable-essence.railway.app/api/auth/subjects/${id}/sessions`)
-      .then(res => res.json())
+    apiClient.teacher.getSubjectSessions(id)
       .then(data => {
         setSessions(data.sessions || [])
       })
