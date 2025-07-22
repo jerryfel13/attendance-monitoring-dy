@@ -188,7 +188,7 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
 
   const totalStudents = students.length
   const avgAttendance = sessions.length > 0 
-    ? Math.round(sessions.reduce((acc, s) => acc + s.attendance_rate, 0) / sessions.length)
+    ? Math.round(sessions.reduce((acc, s) => acc + (isNaN(s.attendance_rate) ? 0 : s.attendance_rate), 0) / sessions.length)
     : 0
 
   return (
@@ -241,7 +241,7 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{avgAttendance}%</div>
+              <div className="text-2xl font-bold">{isNaN(avgAttendance) ? 0 : avgAttendance}%</div>
             </CardContent>
           </Card>
 
@@ -311,8 +311,8 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
                         <TableCell>{student.student_id}</TableCell>
                         <TableCell>{student.email}</TableCell>
                         <TableCell>
-                          <Badge variant={student.attendance_rate >= 80 ? "default" : "destructive"}>
-                            {student.attendance_rate}%
+                          <Badge variant={typeof student.attendance_rate === 'number' && !isNaN(student.attendance_rate) && student.attendance_rate >= 80 ? "default" : "destructive"}>
+                            {typeof student.attendance_rate === 'number' && !isNaN(student.attendance_rate) ? `${student.attendance_rate}%` : '-'}
                           </Badge>
                         </TableCell>
                         <TableCell>{student.present_sessions}</TableCell>
