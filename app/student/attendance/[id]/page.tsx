@@ -44,7 +44,7 @@ export default function StudentAttendanceDetails({ params }: { params: { id: str
   }, [user, params.id]);
 
   // Filter attendance by session if selected
-  const filteredAttendance = selectedSession
+  const filteredAttendance = selectedSession && selectedSession !== "all"
     ? attendance.filter((a: any) => a.session_id === selectedSession)
     : attendance;
 
@@ -62,7 +62,7 @@ export default function StudentAttendanceDetails({ params }: { params: { id: str
                 <SelectValue placeholder="All Sessions" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Sessions</SelectItem>
+                <SelectItem value="all">All Sessions</SelectItem>
                 {sessions.map((session: any) => (
                   <SelectItem key={session.id} value={session.id}>
                     {session.session_date} {session.session_time}
