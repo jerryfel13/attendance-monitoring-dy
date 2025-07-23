@@ -93,11 +93,15 @@ export default function StudentDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {Math.round(
-                  subjects.filter((s) => s.enrolled).reduce((acc, s) => acc + s.attendanceRate, 0) /
-                    subjects.filter((s) => s.enrolled).length,
-                )}
-                %
+                {(() => {
+                  const enrolledSubjects = subjects.filter((s) => s.enrolled);
+                  if (enrolledSubjects.length === 0) return '0%';
+                  const avg = Math.round(
+                    enrolledSubjects.reduce((acc, s) => acc + s.attendanceRate, 0) /
+                      enrolledSubjects.length
+                  );
+                  return `${isNaN(avg) ? 0 : avg}%`;
+                })()}
               </div>
             </CardContent>
           </Card>
