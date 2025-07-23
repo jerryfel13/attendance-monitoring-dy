@@ -8,9 +8,9 @@ export default function HomePage() {
       <Card className="w-full max-w-md shadow-xl rounded-2xl border-0 bg-white/90 backdrop-blur-sm">
         <CardHeader className="flex flex-col items-center gap-2 pb-0">
           <div className="w-24 h-24 flex items-center justify-center mb-2">
-            <img src="/jwd-logo.png" alt="JWD Web Development Logo" className="w-20 h-20 object-contain" />
+            <img src="/jwd-logo.png" alt="Attendance 101 Logo" className="w-20 h-20 object-contain" />
           </div>
-          <CardTitle className="text-3xl font-bold text-gray-900 text-center">QR Attendance System</CardTitle>
+          <CardTitle className="text-3xl font-bold text-gray-900 text-center">Attendance 101</CardTitle>
           <CardDescription className="text-base text-gray-600 text-center">
             Modern attendance tracking with QR codes for seamless check-in and monitoring
           </CardDescription>
