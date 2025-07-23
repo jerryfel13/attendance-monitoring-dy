@@ -111,7 +111,32 @@ export default async function handler(req, res) {
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Subject not found' });
       }
-      return res.json({ subject: result.rows[0] });
+      
+      const subject = result.rows[0];
+      
+      // Get student count for this subject
+      const studentsResult = await pool.query(
+        'SELECT COUNT(*) FROM enrollments WHERE subject_id = $1',
+        [id]
+      );
+      const students = parseInt(studentsResult.rows[0].count, 10);
+      
+      // Format schedule string
+      let schedule = '';
+      if (subject.schedule_days && subject.start_time && subject.end_time) {
+        schedule = `${subject.schedule_days.join(', ')} ${subject.start_time} - ${subject.end_time}`;
+      } else {
+        schedule = 'Schedule not set';
+      }
+      
+      // Add computed properties to subject
+      const subjectWithStats = {
+        ...subject,
+        students,
+        schedule
+      };
+      
+      return res.json({ subject: subjectWithStats });
     } catch (err) {
       return res.status(500).json({ error: 'Failed to fetch subject', details: err.message });
     }
