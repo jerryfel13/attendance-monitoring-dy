@@ -637,7 +637,7 @@ router.post('/scan', async (req, res) => {
       
       // Determine attendance status (present or late)
       const sessionData = await pool.query(
-        'SELECT s.session_time, s.session_date, sub.late_threshold FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
+        'SELECT s.session_time, s.session_date, sub.late_threshold, sub.start_time FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
         [sessionId]
       );
       
@@ -652,17 +652,17 @@ router.post('/scan', async (req, res) => {
       const session = sessionData.rows[0];
       const lateThreshold = session.late_threshold || 15; // Default 15 minutes
       
-      // Parse session time and current time
-      const sessionTime = new Date(`${session.session_date}T${session.session_time}`);
+      // Parse subject's scheduled start time and current time
+      const scheduledStartTime = new Date(`${session.session_date}T${session.start_time}`);
       const currentTime = new Date();
-      const timeDifference = (currentTime.getTime() - sessionTime.getTime()) / (1000 * 60); // Difference in minutes
+      const timeDifference = (currentTime.getTime() - scheduledStartTime.getTime()) / (1000 * 60); // Difference in minutes
       
       let attendanceStatus = 'present';
       let statusMessage = 'Attendance marked';
       
       if (timeDifference > lateThreshold) {
         attendanceStatus = 'late';
-        statusMessage = `Attendance marked (LATE - ${Math.round(timeDifference)} minutes after start)`;
+        statusMessage = `Attendance marked (LATE - ${Math.round(timeDifference)} minutes after scheduled start)`;
       }
       
       // Mark attendance with appropriate status

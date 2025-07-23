@@ -211,14 +211,14 @@ export default async function handler(req, res) {
         const record = recordResult.rows[0];
         // Get session info for late threshold
         const sessionData = await pool.query(
-          'SELECT s.session_time, s.session_date, sub.late_threshold FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
+          'SELECT s.session_time, s.session_date, sub.late_threshold, sub.start_time FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
           [sessionId]
         );
         const session = sessionData.rows[0];
         const lateThreshold = session.late_threshold || 15;
-        const sessionTime = new Date(`${session.session_date}T${session.session_time}`);
+        const scheduledStartTime = new Date(`${session.session_date}T${session.start_time}`);
         const checkInTime = new Date(record.check_in_time);
-        const timeDifference = (checkInTime.getTime() - sessionTime.getTime()) / (1000 * 60);
+        const timeDifference = (checkInTime.getTime() - scheduledStartTime.getTime()) / (1000 * 60);
         let attendanceStatus = 'present';
         if (timeDifference > lateThreshold) {
           attendanceStatus = 'late';
@@ -317,14 +317,14 @@ export default async function handler(req, res) {
         const record = recordResult.rows[0];
         // Get session info for late threshold
         const sessionData = await pool.query(
-          'SELECT s.session_time, s.session_date, sub.late_threshold FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
+          'SELECT s.session_time, s.session_date, sub.late_threshold, sub.start_time FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
           [manualCode.session_id]
         );
         const session = sessionData.rows[0];
         const lateThreshold = session.late_threshold || 15;
-        const sessionTime = new Date(`${session.session_date}T${session.session_time}`);
+        const scheduledStartTime = new Date(`${session.session_date}T${session.start_time}`);
         const checkInTime = new Date(record.check_in_time);
-        const timeDifference = (checkInTime.getTime() - sessionTime.getTime()) / (1000 * 60);
+        const timeDifference = (checkInTime.getTime() - scheduledStartTime.getTime()) / (1000 * 60);
         let attendanceStatus = 'present';
         if (timeDifference > lateThreshold) {
           attendanceStatus = 'late';
