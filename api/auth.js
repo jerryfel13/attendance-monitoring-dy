@@ -158,14 +158,46 @@ export default async function handler(req, res) {
             success: false 
           });
         }
-        // Insert with status 'pending'
+        
+        // Determine attendance status (present or late) during scan-in
+        const sessionData = await pool.query(
+          'SELECT s.session_time, s.session_date, sub.late_threshold, sub.start_time FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
+          [sessionId]
+        );
+        
+        if (sessionData.rows.length === 0) {
+          return res.status(404).json({ 
+            type: 'attendance',
+            message: 'Session data not found',
+            success: false 
+          });
+        }
+        
+        const session = sessionData.rows[0];
+        const lateThreshold = session.late_threshold || 15; // Default 15 minutes
+        
+        // Parse subject's scheduled start time and current time
+        const scheduledStartTime = new Date(`${session.session_date}T${session.start_time}`);
+        const currentTime = new Date();
+        const timeDifference = (currentTime.getTime() - scheduledStartTime.getTime()) / (1000 * 60); // Difference in minutes
+        
+        let attendanceStatus = 'present';
+        let statusMessage = 'Scan-in successful. Please scan out at the end of class to confirm your attendance.';
+        
+        if (timeDifference > lateThreshold) {
+          attendanceStatus = 'late';
+          statusMessage = `Scan-in successful (LATE - ${Math.round(timeDifference)} minutes after scheduled start). Please scan out at the end of class.`;
+        }
+        
+        // Insert with appropriate status
         await pool.query(
           'INSERT INTO attendance_records (session_id, student_id, status, check_in_time) VALUES ($1, $2, $3, NOW())',
-          [sessionId, studentId, 'pending']
+          [sessionId, studentId, attendanceStatus]
         );
+        
         return res.json({
           type: 'attendance',
-          message: `Scan-in successful. Please scan out at the end of class to confirm your attendance.`,
+          message: statusMessage,
           success: true
         });
       } else if (qrCode.startsWith("ATTENDANCE-OUT:")) {
@@ -198,7 +230,7 @@ export default async function handler(req, res) {
         const sessionId = sessionResult.rows[0].id;
         // Get scan-in record
         const recordResult = await pool.query(
-          'SELECT id, check_in_time FROM attendance_records WHERE session_id = $1 AND student_id = $2',
+          'SELECT id, check_in_time, status FROM attendance_records WHERE session_id = $1 AND student_id = $2',
           [sessionId, studentId]
         );
         if (recordResult.rows.length === 0) {
@@ -209,25 +241,43 @@ export default async function handler(req, res) {
           });
         }
         const record = recordResult.rows[0];
-        // Get session info for late threshold
-        const sessionData = await pool.query(
-          'SELECT s.session_time, s.session_date, sub.late_threshold, sub.start_time FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
-          [sessionId]
-        );
-        const session = sessionData.rows[0];
-        const lateThreshold = session.late_threshold || 15;
-        const scheduledStartTime = new Date(`${session.session_date}T${session.start_time}`);
-        const checkInTime = new Date(record.check_in_time);
-        const timeDifference = (checkInTime.getTime() - scheduledStartTime.getTime()) / (1000 * 60);
-        let attendanceStatus = 'present';
-        if (timeDifference > lateThreshold) {
-          attendanceStatus = 'late';
+        
+        // If the record already has a final status (present/late), don't recalculate
+        if (record.status === 'present' || record.status === 'late') {
+          // Just update check_out_time, keep existing status
+          await pool.query(
+            'UPDATE attendance_records SET check_out_time = NOW() WHERE id = $1',
+            [record.id]
+          );
+          return res.json({
+            type: 'attendance',
+            message: 'Scan-out successful. Your attendance is confirmed.',
+            success: true
+          });
         }
-        // Update record with check_out_time and final status
-        await pool.query(
-          'UPDATE attendance_records SET check_out_time = NOW(), status = $1 WHERE id = $2',
-          [attendanceStatus, record.id]
-        );
+        
+        // Only recalculate status if it was 'pending' (for backward compatibility)
+        if (record.status === 'pending') {
+          // Get session info for late threshold
+          const sessionData = await pool.query(
+            'SELECT s.session_time, s.session_date, sub.late_threshold, sub.start_time FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
+            [sessionId]
+          );
+          const session = sessionData.rows[0];
+          const lateThreshold = session.late_threshold || 15;
+          const scheduledStartTime = new Date(`${session.session_date}T${session.start_time}`);
+          const checkInTime = new Date(record.check_in_time);
+          const timeDifference = (checkInTime.getTime() - scheduledStartTime.getTime()) / (1000 * 60);
+          let attendanceStatus = 'present';
+          if (timeDifference > lateThreshold) {
+            attendanceStatus = 'late';
+          }
+          // Update record with check_out_time and final status
+          await pool.query(
+            'UPDATE attendance_records SET check_out_time = NOW(), status = $1 WHERE id = $2',
+            [attendanceStatus, record.id]
+          );
+        }
         return res.json({
           type: 'attendance',
           message: 'Scan-out successful. Your attendance is confirmed.',
