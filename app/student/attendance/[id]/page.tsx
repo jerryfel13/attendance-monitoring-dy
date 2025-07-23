@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectItem, SelectTrigger, SelectContent, SelectValue } from "@/components/ui/select";
+import { ArrowLeft } from "lucide-react";
 import { apiClient } from "@/lib/api";
 
 export default function StudentAttendanceDetails({ params }: { params: { id: string } }) {
@@ -50,6 +51,16 @@ export default function StudentAttendanceDetails({ params }: { params: { id: str
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <div className="mb-6">
+        <Button 
+          variant="ghost" 
+          onClick={() => router.push("/student/dashboard")}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Dashboard
+        </Button>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>Attendance Details - {subject?.name || "Subject"}</CardTitle>
