@@ -51,7 +51,9 @@ CREATE TABLE IF NOT EXISTS attendance_records (
     id SERIAL PRIMARY KEY,
     session_id INTEGER REFERENCES attendance_sessions(id) ON DELETE CASCADE,
     student_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    status VARCHAR(50) NOT NULL CHECK (status IN ('present', 'late', 'absent')),
+    check_in_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    check_out_time TIMESTAMP,
+    status VARCHAR(50) NOT NULL CHECK (status IN ('present', 'late', 'absent', 'pending')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(session_id, student_id)
 );

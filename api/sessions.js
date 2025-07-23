@@ -25,25 +25,42 @@ export default async function handler(req, res) {
         [session.subject_id]
       );
       
-      // Get students who already marked attendance
+      // Get students who already marked attendance with final status
       const markedStudents = await pool.query(
-        'SELECT ar.student_id FROM attendance_records ar WHERE ar.session_id = $1',
+        'SELECT ar.student_id, ar.status FROM attendance_records ar WHERE ar.session_id = $1',
         [id]
       );
       
-      const markedStudentIds = markedStudents.rows.map(row => row.student_id);
+      const finalStatusStudentIds = markedStudents.rows
+        .filter(row => ['present', 'late', 'absent'].includes(row.status))
+        .map(row => row.student_id);
       
-      // Find students who didn't mark attendance (absent)
+      // Find students who didn't mark attendance or only have pending status (absent)
       const absentStudents = enrolledStudents.rows.filter(
-        student => !markedStudentIds.includes(student.student_id)
+        student => !finalStatusStudentIds.includes(student.student_id)
       );
       
-      // Mark absent students
+      // Mark absent students (including those with pending status)
       for (const student of absentStudents) {
-        await pool.query(
-          'INSERT INTO attendance_records (session_id, student_id, status) VALUES ($1, $2, $3)',
-          [id, student.student_id, 'absent']
+        // Check if student has a pending record
+        const pendingRecord = await pool.query(
+          'SELECT id FROM attendance_records WHERE session_id = $1 AND student_id = $2 AND status = $3',
+          [id, student.student_id, 'pending']
         );
+        
+        if (pendingRecord.rows.length > 0) {
+          // Update pending record to absent
+          await pool.query(
+            'UPDATE attendance_records SET status = $1 WHERE session_id = $2 AND student_id = $3',
+            ['absent', id, student.student_id]
+          );
+        } else {
+          // Create new absent record
+          await pool.query(
+            'INSERT INTO attendance_records (session_id, student_id, status) VALUES ($1, $2, $3)',
+            [id, student.student_id, 'absent']
+          );
+        }
       }
       
       // Deactivate the session
