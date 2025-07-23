@@ -225,7 +225,9 @@ export default async function handler(req, res) {
       const result = await pool.query(`
         SELECT 
           ar.id, ar.status, ar.check_in_time,
-          s.session_date, s.session_time
+          s.session_date, s.session_time,
+          TO_CHAR(s.session_date, 'Mon DD, YYYY') as formatted_date,
+          TO_CHAR(s.session_time, 'HH:MI AM') as formatted_time
         FROM attendance_records ar
         JOIN attendance_sessions s ON ar.session_id = s.id
         WHERE ar.student_id = $1 AND s.subject_id = $2

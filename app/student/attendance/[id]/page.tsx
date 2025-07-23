@@ -88,8 +88,8 @@ export default function StudentAttendanceDetails({ params }: { params: { id: str
                 ) : (
                   filteredAttendance.map((record: any) => (
                     <tr key={record.id}>
-                      <td className="border px-2 py-1">{record.session_date}</td>
-                      <td className="border px-2 py-1">{record.session_time}</td>
+                      <td className="border px-2 py-1">{record.formatted_date || record.session_date}</td>
+                      <td className="border px-2 py-1">{record.formatted_time || record.session_time}</td>
                       <td className="border px-2 py-1">{record.status}</td>
                     </tr>
                   ))
