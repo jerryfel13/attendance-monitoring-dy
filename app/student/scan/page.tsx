@@ -199,19 +199,19 @@ export default function ScanPage() {
                     </Button>
                   </div>
                   {/* Manual code input remains */}
-                  <div className="space-y-2">
+              <div className="space-y-2">
                     <Label htmlFor="manualCode">Manual Attendance Code</Label>
-                    <Input
+                <Input
                       id="manualCode"
                       placeholder="Enter manual code from teacher"
                       value={manualCode}
                       onChange={(e) => setManualCode(e.target.value)}
                       autoComplete="off"
-                    />
+                />
                     <Button onClick={handleManualCode} disabled={!manualCode.trim() || manualSubmitting} className="w-full mt-2">
                       {manualSubmitting ? "Submitting..." : "Submit Manual Code"}
                     </Button>
-                  </div>
+              </div>
                 </>
               ) : (
                 <div className="space-y-4">
@@ -219,8 +219,8 @@ export default function ScanPage() {
                   <Button onClick={stopCamera} variant="outline" className="w-full">
                     <X className="w-4 h-4 mr-2" />
                     Stop Camera
-                  </Button>
-                </div>
+                </Button>
+              </div>
               )}
             </CardContent>
           </Card>

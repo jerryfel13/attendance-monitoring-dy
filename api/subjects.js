@@ -215,6 +215,28 @@ export default async function handler(req, res) {
     }
   }
 
+  // Get student attendance for a specific subject
+  if (route === 'student-attendance' && req.method === 'GET') {
+    const { studentId, subjectId } = req.query;
+    if (!studentId || !subjectId) {
+      return res.status(400).json({ error: 'Missing studentId or subjectId' });
+    }
+    try {
+      const result = await pool.query(`
+        SELECT 
+          ar.id, ar.status, ar.created_at,
+          s.session_date, s.session_time
+        FROM attendance_records ar
+        JOIN attendance_sessions s ON ar.session_id = s.id
+        WHERE ar.student_id = $1 AND s.subject_id = $2
+        ORDER BY s.session_date DESC, s.session_time DESC
+      `, [studentId, subjectId]);
+      return res.json({ attendance: result.rows });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to fetch attendance', details: err.message });
+    }
+  }
+
   // Default: Not found
   return res.status(404).json({ error: 'Not found' });
 } 

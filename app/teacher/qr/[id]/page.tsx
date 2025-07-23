@@ -306,15 +306,15 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                   </div>
 
                   <div className="space-y-3">
-                    <div className="flex space-x-2">
-                      <Button className="flex-1">
-                        <Download className="w-4 h-4 mr-2" />
-                        Download QR
-                      </Button>
-                      <Button variant="outline" className="flex-1 bg-transparent">
-                        <QrCode className="w-4 h-4 mr-2" />
-                        Display QR
-                      </Button>
+                  <div className="flex space-x-2">
+                    <Button className="flex-1">
+                      <Download className="w-4 h-4 mr-2" />
+                      Download QR
+                    </Button>
+                    <Button variant="outline" className="flex-1 bg-transparent">
+                      <QrCode className="w-4 h-4 mr-2" />
+                      Display QR
+                    </Button>
                     </div>
                     
                     <div className="flex space-x-2">

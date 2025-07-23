@@ -29,15 +29,15 @@ export default function StudentAttendanceDetails({ params }: { params: { id: str
   useEffect(() => {
     if (!user) return;
     // Fetch subject info
-    apiClient.request(`/subjects/${params.id}`)
+    apiClient.request(`/subjects?route=get&id=${params.id}`)
       .then((res: any) => setSubject(res.subject))
       .catch(() => setSubject(null));
     // Fetch sessions
-    apiClient.request(`/subjects/${params.id}/sessions`)
+    apiClient.request(`/subjects?route=sessions&id=${params.id}`)
       .then((res: any) => setSessions(res.sessions || []))
       .catch(() => setSessions([]));
     // Fetch all attendance records for this subject/student
-    apiClient.request(`/student/${user.id}/attendance?subjectId=${params.id}`)
+    apiClient.request(`/subjects?route=student-attendance&studentId=${user.id}&subjectId=${params.id}`)
       .then((res: any) => setAttendance(res.attendance || []))
       .catch(() => setAttendance([]))
       .finally(() => setLoading(false));
