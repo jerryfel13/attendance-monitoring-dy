@@ -276,13 +276,26 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing code or studentId' });
     }
     try {
+      console.log('Manual code submission:', { code, studentId });
+      
       // Find unused code
       const result = await pool.query(
         'SELECT id, session_id, type, used FROM manual_attendance_codes WHERE code = $1 AND used = false',
         [code]
       );
+      
+      console.log('Manual code lookup result:', result.rows);
+      
       if (result.rows.length === 0) {
-        return res.status(404).json({ error: 'Invalid or already used code' });
+        // Check if code exists but is used
+        const usedCodeCheck = await pool.query(
+          'SELECT id, used FROM manual_attendance_codes WHERE code = $1',
+          [code]
+        );
+        if (usedCodeCheck.rows.length > 0) {
+          return res.status(409).json({ error: 'Code has already been used' });
+        }
+        return res.status(404).json({ error: 'Invalid code' });
       }
       const manualCode = result.rows[0];
       // Mark code as used
@@ -292,19 +305,39 @@ export default async function handler(req, res) {
       );
       // Mark attendance (in or out)
       if (manualCode.type === 'in') {
-        // Only allow if not already scanned in
+        // Check if already scanned in
         const attendanceCheck = await pool.query(
-          'SELECT id FROM attendance_records WHERE session_id = $1 AND student_id = $2',
+          'SELECT id, status FROM attendance_records WHERE session_id = $1 AND student_id = $2',
           [manualCode.session_id, studentId]
         );
+        
         if (attendanceCheck.rows.length > 0) {
-          return res.status(409).json({ error: 'Already scanned in for this session' });
+          const existingRecord = attendanceCheck.rows[0];
+          // If already has a final status (present/late/absent), don't allow scan-in
+          if (['present', 'late', 'absent'].includes(existingRecord.status)) {
+            return res.status(409).json({ error: 'Already scanned in for this session' });
+          }
+          // If pending, update to mark as scanned in again
+          if (existingRecord.status === 'pending') {
+            return res.json({ message: 'Already scanned in for this session. Please scan out when class ends.' });
+          }
         }
-        await pool.query(
-          'INSERT INTO attendance_records (session_id, student_id, status, check_in_time) VALUES ($1, $2, $3, NOW())',
-          [manualCode.session_id, studentId, 'pending']
-        );
-        return res.json({ message: 'Manual scan-in successful. Please scan out or ask for a manual code at the end of class.' });
+        
+        // Insert new attendance record
+        try {
+          await pool.query(
+            'INSERT INTO attendance_records (session_id, student_id, status, check_in_time) VALUES ($1, $2, $3, NOW())',
+            [manualCode.session_id, studentId, 'pending']
+          );
+          console.log('Attendance record created successfully for student:', studentId, 'session:', manualCode.session_id);
+          return res.json({ 
+            message: 'Manual scan-in successful. Please scan out or ask for a manual code at the end of class.',
+            success: true 
+          });
+        } catch (insertError) {
+          console.error('Error creating attendance record:', insertError);
+          return res.status(500).json({ error: 'Failed to create attendance record', details: insertError.message });
+        }
       } else if (manualCode.type === 'out') {
         // Only allow if already scanned in and not scanned out
         const recordResult = await pool.query(

@@ -66,12 +66,26 @@ const setupDatabase = async () => {
         id SERIAL PRIMARY KEY,
         session_id INTEGER REFERENCES attendance_sessions(id) ON DELETE CASCADE,
         student_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        status VARCHAR(50) NOT NULL CHECK (status IN ('present', 'late', 'absent')),
+        check_in_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        check_out_time TIMESTAMP,
+        status VARCHAR(50) NOT NULL CHECK (status IN ('present', 'late', 'absent', 'pending')),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(session_id, student_id)
       );
     `);
     console.log('✅ Attendance records table created');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS manual_attendance_codes (
+        id SERIAL PRIMARY KEY,
+        session_id INTEGER REFERENCES attendance_sessions(id) ON DELETE CASCADE,
+        type VARCHAR(10) NOT NULL CHECK (type IN ('in', 'out')),
+        code VARCHAR(20) NOT NULL,
+        used BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Manual attendance codes table created');
 
     // Create indexes
     await pool.query('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);');
