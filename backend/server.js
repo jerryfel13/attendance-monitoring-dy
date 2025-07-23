@@ -5,6 +5,8 @@ require('dotenv').config();
 const authRoutes = require('./routes/auth');
 const subjectsRoutes = require('./routes/subjects');
 const sessionsRoutes = require('./routes/sessions');
+const studentsRoutes = require('./routes/students');
+const recordsRoutes = require('./routes/records');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -102,6 +104,8 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/subjects', subjectsRoutes);
 app.use('/api/sessions', sessionsRoutes);
+app.use('/api/student', studentsRoutes);
+app.use('/api/records', recordsRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

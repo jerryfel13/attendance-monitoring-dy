@@ -5,7 +5,227 @@ const { Pool } = require('pg');
 const router = express.Router();
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-// Registration endpoint
+// Handle route-based requests
+router.post('/', async (req, res) => {
+  const { route } = req.query;
+  
+  if (route === 'register') {
+    const { name, email, password, role, studentId } = req.body;
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    try {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const uniqueId = `${role.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+      const result = await pool.query(
+        'INSERT INTO users (unique_id, name, email, password_hash, role, student_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, unique_id, name, email, role, student_id',
+        [uniqueId, name, email, hashedPassword, role, studentId || null]
+      );
+      res.status(201).json({ user: result.rows[0] });
+    } catch (err) {
+      if (err.code === '23505') {
+        res.status(409).json({ error: 'Email already exists' });
+      } else {
+        res.status(500).json({ error: 'Registration failed', details: err.message });
+      }
+    }
+  } else if (route === 'login') {
+    console.log('Login request body:', req.body);
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    try {
+      const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+      if (result.rows.length === 0) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+      const user = result.rows[0];
+      const match = await bcrypt.compare(password, user.password_hash);
+      if (!match) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+      // Exclude password_hash from response
+      const { password_hash, ...userData } = user;
+      res.json({ user: userData });
+    } catch (err) {
+      res.status(500).json({ error: 'Login failed', details: err.message });
+    }
+  } else if (route === 'scan') {
+    // Handle QR code scanning
+    const { qrCode, studentId } = req.body;
+    if (!qrCode || !studentId) {
+      return res.status(400).json({ error: 'Missing QR code or student ID' });
+    }
+
+    // Debug: Log the QR code and extracted data
+    console.log('QR Code received:', qrCode);
+    console.log('Student ID:', studentId);
+
+    try {
+      if (qrCode.startsWith("SUBJECT:")) {
+        // Handle subject enrollment
+        const subjectInfo = qrCode.replace("SUBJECT:", "").trim();
+        
+        // Extract subject name and code from QR data
+        const match = subjectInfo.match(/^(.+?)\s*\(([^)]+)\)/);
+        if (!match) {
+          return res.status(400).json({ error: 'Invalid subject QR code format' });
+        }
+        
+        const [, subjectName, subjectCode] = match;
+        
+        // Debug: Log extracted data
+        console.log('Extracted subject name:', subjectName.trim());
+        console.log('Extracted subject code:', subjectCode.trim());
+        
+        // Find the subject by name and code (with more flexible matching)
+        const subjectResult = await pool.query(
+          'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
+          [subjectName.trim(), subjectCode.trim()]
+        );
+        
+        if (subjectResult.rows.length === 0) {
+          return res.status(404).json({ error: 'Subject not found' });
+        }
+        
+        const subjectId = subjectResult.rows[0].id;
+        
+        // Check if already enrolled
+        const enrollmentCheck = await pool.query(
+          'SELECT id FROM enrollments WHERE student_id = $1 AND subject_id = $2',
+          [studentId, subjectId]
+        );
+        
+        if (enrollmentCheck.rows.length > 0) {
+          return res.status(409).json({ 
+            type: 'enrollment',
+            message: `Already enrolled in ${subjectName} (${subjectCode})`,
+            success: false 
+          });
+        }
+        
+        // Enroll student in subject
+        await pool.query(
+          'INSERT INTO enrollments (student_id, subject_id) VALUES ($1, $2)',
+          [studentId, subjectId]
+        );
+        
+        res.json({
+          type: 'enrollment',
+          message: `Successfully enrolled in ${subjectName} (${subjectCode})`,
+          success: true
+        });
+        
+      } else if (qrCode.startsWith("ATTENDANCE:")) {
+        // Handle attendance marking
+        const attendanceInfo = qrCode.replace("ATTENDANCE:", "").trim();
+        
+        // Extract subject name and code from QR data
+        const match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)/);
+        if (!match) {
+          return res.status(400).json({ error: 'Invalid attendance QR code format' });
+        }
+        
+        const [, subjectName, subjectCode] = match;
+        
+        // Find the subject and active session
+        const sessionResult = await pool.query(`
+          SELECT s.id, s.session_date, s.session_time, sub.late_threshold
+          FROM attendance_sessions s
+          JOIN subjects sub ON s.subject_id = sub.id
+          WHERE sub.name = $1 AND sub.code = $2 AND s.is_active = true
+          ORDER BY s.session_date DESC, s.session_time DESC
+          LIMIT 1
+        `, [subjectName.trim(), subjectCode.trim()]);
+        
+        if (sessionResult.rows.length === 0) {
+          return res.status(404).json({ 
+            type: 'attendance',
+            message: 'No active session found for this subject',
+            success: false 
+          });
+        }
+        
+        const sessionId = sessionResult.rows[0].id;
+        
+        // Check if already marked attendance
+        const attendanceCheck = await pool.query(
+          'SELECT id FROM attendance_records WHERE session_id = $1 AND student_id = $2',
+          [sessionId, studentId]
+        );
+        
+        if (attendanceCheck.rows.length > 0) {
+          return res.status(409).json({ 
+            type: 'attendance',
+            message: 'Attendance already marked for this session',
+            success: false 
+          });
+        }
+        
+        // Determine attendance status (present or late)
+        const sessionData = await pool.query(
+          'SELECT s.session_time, s.session_date, sub.late_threshold FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
+          [sessionId]
+        );
+        
+        if (sessionData.rows.length === 0) {
+          return res.status(404).json({ 
+            type: 'attendance',
+            message: 'Session data not found',
+            success: false 
+          });
+        }
+        
+        const session = sessionData.rows[0];
+        const lateThreshold = session.late_threshold || 15; // Default 15 minutes
+        
+        // Parse session time and current time
+        const sessionTime = new Date(`${session.session_date}T${session.session_time}`);
+        const currentTime = new Date();
+        const timeDifference = (currentTime.getTime() - sessionTime.getTime()) / (1000 * 60); // Difference in minutes
+        
+        let attendanceStatus = 'present';
+        let statusMessage = 'Attendance marked';
+        
+        if (timeDifference > lateThreshold) {
+          attendanceStatus = 'late';
+          statusMessage = `Attendance marked (LATE - ${Math.round(timeDifference)} minutes after start)`;
+        }
+        
+        // Mark attendance with appropriate status
+        await pool.query(
+          'INSERT INTO attendance_records (session_id, student_id, status) VALUES ($1, $2, $3)',
+          [sessionId, studentId, attendanceStatus]
+        );
+        
+        res.json({
+          type: 'attendance',
+          message: `${statusMessage} for ${subjectName} (${subjectCode}) at ${new Date().toLocaleTimeString()}`,
+          success: true
+        });
+        
+      } else {
+        res.status(400).json({ 
+          type: 'error',
+          message: 'Invalid QR code. Please scan a valid subject or attendance QR code.',
+          success: false 
+        });
+      }
+    } catch (err) {
+      console.error('QR scan error:', err);
+      res.status(500).json({ 
+        type: 'error',
+        message: 'Failed to process QR code',
+        success: false 
+      });
+    }
+  } else {
+    res.status(400).json({ error: 'Invalid route' });
+  }
+});
+
+// Registration endpoint (legacy)
 router.post('/register', async (req, res) => {
   const { name, email, password, role, studentId } = req.body;
   if (!name || !email || !password || !role) {
@@ -28,7 +248,35 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Login endpoint
+// Handle GET route-based requests
+router.get('/', async (req, res) => {
+  const { route } = req.query;
+  
+  if (route === 'session-attendance') {
+    const { sessionId } = req.query;
+    if (!sessionId) {
+      return res.status(400).json({ error: 'Missing sessionId' });
+    }
+    try {
+      const result = await pool.query(`
+        SELECT 
+          ar.id, ar.status, ar.created_at,
+          u.name as student_name, u.email as student_email, u.student_id
+        FROM attendance_records ar
+        JOIN users u ON ar.student_id = u.id
+        WHERE ar.session_id = $1
+        ORDER BY ar.created_at
+      `, [sessionId]);
+      res.json({ attendance: result.rows });
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch session attendance', details: err.message });
+    }
+  } else {
+    res.status(400).json({ error: 'Invalid route' });
+  }
+});
+
+// Login endpoint (legacy)
 router.post('/login', async (req, res) => {
   console.log('Login request body:', req.body);
   const { email, password } = req.body;
