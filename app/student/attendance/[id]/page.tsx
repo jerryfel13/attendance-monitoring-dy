@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectItem } from "@/components/ui/select";
+import { Select, SelectItem, SelectTrigger, SelectContent, SelectValue } from "@/components/ui/select";
 import { apiClient } from "@/lib/api";
 
 export default function StudentAttendanceDetails({ params }: { params: { id: string } }) {
@@ -58,12 +58,17 @@ export default function StudentAttendanceDetails({ params }: { params: { id: str
           <div className="mb-4 flex items-center space-x-4">
             <span>Filter by Session:</span>
             <Select value={selectedSession} onValueChange={setSelectedSession}>
-              <SelectItem value="">All Sessions</SelectItem>
-              {sessions.map((session: any) => (
-                <SelectItem key={session.id} value={session.id}>
-                  {session.session_date} {session.session_time}
-                </SelectItem>
-              ))}
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder="All Sessions" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Sessions</SelectItem>
+                {sessions.map((session: any) => (
+                  <SelectItem key={session.id} value={session.id}>
+                    {session.session_date} {session.session_time}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </div>
           <div className="overflow-x-auto">
