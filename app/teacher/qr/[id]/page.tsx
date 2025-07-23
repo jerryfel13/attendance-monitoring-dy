@@ -166,7 +166,7 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 flex-1">
+      <main className="container mx-auto px-4 py-8 flex-1 pb-8">
         <div className="max-w-4xl mx-auto">
           <div className="grid lg:grid-cols-3 gap-6 mb-8">
             <Card>
@@ -426,6 +426,15 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
           </Tabs>
         </div>
       </main>
+      
+      {/* Footer */}
+      <footer className="bg-white border-t mt-auto py-4">
+        <div className="container mx-auto px-4">
+          <div className="text-center text-sm text-gray-600">
+            © 2024 Jerryfel Laraga. All rights reserved.
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }
