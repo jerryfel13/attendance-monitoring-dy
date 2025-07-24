@@ -158,7 +158,7 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
   if (!subject) return null
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col h-screen">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white shadow-sm border-b flex-shrink-0">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center space-x-4">
@@ -177,7 +177,7 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 flex-1 pb-8 min-h-0">
+      <main className="container mx-auto px-4 py-8 flex-1 pb-8">
         <div className="max-w-4xl mx-auto">
           <div className="grid lg:grid-cols-3 gap-6 mb-8">
             <Card>
