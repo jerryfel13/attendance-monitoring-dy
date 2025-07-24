@@ -98,18 +98,49 @@ export default function ScanPage() {
         qrCode: dataToProcess,
         studentId: user?.id,
       })
+      
+      // Clear the QR code after successful scan
+      setQrCode("")
+      
       toast({
         title: data.success ? "Success" : "Error",
         description: data.message,
         variant: data.success ? "default" : "destructive"
       });
+      
       if (isCameraActive && data.success) {
         stopCamera()
       }
     } catch (error: any) {
+      // Clear QR code on error too
+      setQrCode("")
+      
+      // Handle specific error types with user-friendly messages
+      let errorMessage = "Failed to process QR code. Please try again."
+      
+      if (error.response?.status === 409) {
+        if (error.response?.data?.type === 'enrollment') {
+          errorMessage = "You are already enrolled in this subject."
+        } else if (error.response?.data?.type === 'attendance') {
+          errorMessage = "You have already scanned for this session. Please scan out at the end of class."
+        } else {
+          errorMessage = "This QR code has already been used."
+        }
+      } else if (error.response?.status === 403) {
+        errorMessage = "You are not enrolled in this subject. Please enroll first."
+      } else if (error.response?.status === 404) {
+        if (error.response?.data?.type === 'attendance') {
+          errorMessage = "No active attendance session found. Please wait for the teacher to start the session."
+        } else {
+          errorMessage = "Subject not found. Please check the QR code."
+        }
+      } else if (error.response?.status === 400) {
+        errorMessage = "Invalid QR code format. Please scan a valid QR code."
+      }
+      
       toast({
         title: "Error",
-        description: error.message || "Failed to process QR code. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -119,9 +150,9 @@ export default function ScanPage() {
 
   const simulateCamera = () => {
     const mockQRCodes = [
-      "SUBJECT:Data Structures (CS201)",
-      "ATTENDANCE:Database Systems (CS301)",
-      "SUBJECT:Web Development (CS401)",
+      "SUBJECT_Data_Structures_CS201",
+      "ATTENDANCE_Database_Systems_CS301_2024-01-15",
+      "SUBJECT_Web_Development_CS401",
     ]
     const randomQR = mockQRCodes[Math.floor(Math.random() * mockQRCodes.length)]
     setQrCode(randomQR)
@@ -132,16 +163,45 @@ export default function ScanPage() {
     setManualSubmitting(true);
     try {
       const data = await apiClient.auth.submitManualCode({ code: manualCode.trim(), studentId: String(user.id) });
+      
+      // Clear the manual code after successful submission
+      setManualCode("");
+      
       toast({
         title: data.success ? "Success" : "Error",
         description: data.message,
         variant: data.success ? "default" : "destructive"
       });
-      setManualCode("");
     } catch (error: any) {
+      // Clear manual code on error too
+      setManualCode("");
+      
+      // Handle specific error types with user-friendly messages
+      let errorMessage = "Failed to process manual code. Please try again."
+      
+      if (error.response?.status === 409) {
+        if (error.response?.data?.type === 'enrollment') {
+          errorMessage = "You are already enrolled in this subject."
+        } else if (error.response?.data?.type === 'attendance') {
+          errorMessage = "You have already scanned for this session. Please scan out at the end of class."
+        } else {
+          errorMessage = "This code has already been used."
+        }
+      } else if (error.response?.status === 403) {
+        errorMessage = "You are not enrolled in this subject. Please enroll first."
+      } else if (error.response?.status === 404) {
+        if (error.response?.data?.type === 'attendance') {
+          errorMessage = "No active attendance session found. Please wait for the teacher to start the session."
+        } else {
+          errorMessage = "Invalid code. Please check the code and try again."
+        }
+      } else if (error.response?.status === 400) {
+        errorMessage = "Invalid code format. Please enter a valid code."
+      }
+      
       toast({
         title: "Error",
-        description: error.message || 'Failed to process manual code.',
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
