@@ -48,9 +48,10 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
     apiClient.teacher.getSubject(id)
       .then(data => {
         setSubject(data.subject)
-        setEnrollmentQR(`SUBJECT:${data.subject.name} (${data.subject.code})`)
-        setAttendanceQR(`ATTENDANCE:${data.subject.name} (${data.subject.code}) - ${new Date().toLocaleDateString()}`)
-        setAttendanceOutQR(`ATTENDANCE-OUT:${data.subject.name} (${data.subject.code}) - ${new Date().toLocaleDateString()}`)
+        // Simplified QR codes for better scanning
+        setEnrollmentQR(`SUBJECT_${data.subject.name.replace(/\s+/g, '_')}_${data.subject.code}`)
+        setAttendanceQR(`ATTENDANCE_${data.subject.name.replace(/\s+/g, '_')}_${data.subject.code}_${new Date().toISOString().split('T')[0]}`)
+        setAttendanceOutQR(`ATTENDANCE_OUT_${data.subject.name.replace(/\s+/g, '_')}_${data.subject.code}_${new Date().toISOString().split('T')[0]}`)
       })
       .catch(() => setSubject(null))
     // Check for active session
@@ -80,14 +81,14 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
   }
 
   const regenerateAttendanceQR = () => {
-    const newQR = `ATTENDANCE:${subject.name} (${subject.code}) - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`
+    const newQR = `ATTENDANCE_${subject.name.replace(/\s+/g, '_')}_${subject.code}_${new Date().toISOString().split('T')[0]}`
     setAttendanceQR(newQR)
-    setAttendanceOutQR(`ATTENDANCE-OUT:${subject.name} (${subject.code}) - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`)
+    setAttendanceOutQR(`ATTENDANCE_OUT_${subject.name.replace(/\s+/g, '_')}_${subject.code}_${new Date().toISOString().split('T')[0]}`)
   }
 
   const startAttendanceSession = async () => {
     try {
-      const qrData = `ATTENDANCE:${subject.name} (${subject.code}) - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`
+      const qrData = `ATTENDANCE_${subject.name.replace(/\s+/g, '_')}_${subject.code}_${new Date().toISOString().split('T')[0]}`
       setAttendanceQR(qrData)
       const data = await apiClient.teacher.startSession(id, {
         session_date: new Date().toISOString().split('T')[0],
@@ -229,7 +230,12 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                   <div className="flex justify-center">
                     <div className="relative w-64 h-64 bg-white border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
                       <div className="text-center">
-                        <QRCode value={enrollmentQR} size={200} className="mx-auto mb-4" />
+                        <QRCode 
+                          value={enrollmentQR} 
+                          size={200} 
+                          level="H"
+                          className="mx-auto mb-4" 
+                        />
                         <p className="text-sm text-gray-600">QR Code Preview</p>
                       </div>
                       <Button
@@ -290,7 +296,12 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                   <div className="flex justify-center">
                     <div className="relative w-64 h-64 bg-white border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
                       <div className="text-center">
-                        <QRCode value={attendanceQR} size={200} className="mx-auto mb-4" />
+                        <QRCode 
+                          value={attendanceQR} 
+                          size={200} 
+                          level="H"
+                          className="mx-auto mb-4" 
+                        />
                         <p className="text-sm text-gray-600">QR Code Preview</p>
                         <Badge variant="secondary" className="mt-2">
                           Session: {new Date().toLocaleDateString()}
@@ -404,7 +415,12 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                   <div className="flex justify-center">
                     <div className="relative w-64 h-64 bg-white border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
                       <div className="text-center">
-                        <QRCode value={attendanceOutQR} size={200} className="mx-auto mb-4" />
+                        <QRCode 
+                          value={attendanceOutQR} 
+                          size={200} 
+                          level="H"
+                          className="mx-auto mb-4" 
+                        />
                         <p className="text-sm text-gray-600">QR Code Preview</p>
                         <Badge variant="secondary" className="mt-2">
                           Session: {new Date().toLocaleDateString()}
@@ -478,7 +494,11 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
           </DialogHeader>
           <div className="flex flex-col items-center space-y-4">
             <div className="bg-white p-4 rounded-lg border">
-              <QRCode value={previewQrData} size={300} />
+              <QRCode 
+                value={previewQrData} 
+                size={300} 
+                level="H"
+              />
             </div>
             <div className="text-center">
               <p className="text-sm text-gray-600 mb-2">Scan this QR code with your device</p>

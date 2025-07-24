@@ -72,13 +72,14 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing QR code or student ID' });
     }
     try {
-      if (qrCode.startsWith("SUBJECT:")) {
-        const subjectInfo = qrCode.replace("SUBJECT:", "").trim();
-        const match = subjectInfo.match(/^(.+?)\s*\(([^)]+)\)/);
-        if (!match) {
+      if (qrCode.startsWith("SUBJECT_")) {
+        const subjectInfo = qrCode.replace("SUBJECT_", "").trim();
+        const parts = subjectInfo.split('_');
+        if (parts.length < 2) {
           return res.status(400).json({ error: 'Invalid subject QR code format' });
         }
-        const [, subjectName, subjectCode] = match;
+        const subjectCode = parts[parts.length - 1];
+        const subjectName = parts.slice(0, -1).join(' ').replace(/_/g, ' ');
         const subjectResult = await pool.query(
           'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
           [subjectName.trim(), subjectCode.trim()]
@@ -107,14 +108,16 @@ export default async function handler(req, res) {
           message: `Successfully enrolled in ${subjectName} (${subjectCode})!`,
           success: true
         });
-      } else if (qrCode.startsWith("ATTENDANCE:")) {
+      } else if (qrCode.startsWith("ATTENDANCE_")) {
         // SCAN-IN logic
-        const attendanceInfo = qrCode.replace("ATTENDANCE:", "").trim();
-        const match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)/);
-        if (!match) {
+        const attendanceInfo = qrCode.replace("ATTENDANCE_", "").trim();
+        const parts = attendanceInfo.split('_');
+        if (parts.length < 3) {
           return res.status(400).json({ error: 'Invalid attendance QR code format' });
         }
-        const [, subjectName, subjectCode] = match;
+        const date = parts[parts.length - 1];
+        const subjectCode = parts[parts.length - 2];
+        const subjectName = parts.slice(0, -2).join(' ').replace(/_/g, ' ');
         const subjectResult = await pool.query(
           'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
           [subjectName.trim(), subjectCode.trim()]
@@ -200,14 +203,16 @@ export default async function handler(req, res) {
           message: statusMessage,
           success: true
         });
-      } else if (qrCode.startsWith("ATTENDANCE-OUT:")) {
+      } else if (qrCode.startsWith("ATTENDANCE_OUT_")) {
         // SCAN-OUT logic
-        const attendanceInfo = qrCode.replace("ATTENDANCE-OUT:", "").trim();
-        const match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)/);
-        if (!match) {
+        const attendanceInfo = qrCode.replace("ATTENDANCE_OUT_", "").trim();
+        const parts = attendanceInfo.split('_');
+        if (parts.length < 3) {
           return res.status(400).json({ error: 'Invalid attendance QR code format' });
         }
-        const [, subjectName, subjectCode] = match;
+        const date = parts[parts.length - 1];
+        const subjectCode = parts[parts.length - 2];
+        const subjectName = parts.slice(0, -2).join(' ').replace(/_/g, ' ');
         const subjectResult = await pool.query(
           'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
           [subjectName.trim(), subjectCode.trim()]
