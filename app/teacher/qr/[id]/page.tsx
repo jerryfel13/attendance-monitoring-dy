@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, QrCode, Download, RefreshCw, Copy, CheckCircle } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ArrowLeft, QrCode, Download, RefreshCw, Copy, CheckCircle, ZoomIn, X } from "lucide-react"
 import Link from "next/link"
 import QRCode from 'react-qr-code'
 import { apiClient } from "@/lib/api"
@@ -25,6 +26,9 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
   const [manualOutCode, setManualOutCode] = useState<string>("");
   const [manualInLoading, setManualInLoading] = useState(false);
   const [manualOutLoading, setManualOutLoading] = useState(false);
+  const [qrPreviewOpen, setQrPreviewOpen] = useState(false);
+  const [previewQrData, setPreviewQrData] = useState("");
+  const [previewQrTitle, setPreviewQrTitle] = useState("");
   const router = useRouter()
 
   useEffect(() => {
@@ -144,6 +148,12 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
     }
   };
 
+  const openQrPreview = (qrData: string, title: string) => {
+    setPreviewQrData(qrData);
+    setPreviewQrTitle(title);
+    setQrPreviewOpen(true);
+  }
+
   if (!subject) return null
 
   return (
@@ -217,11 +227,19 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="flex justify-center">
-                    <div className="w-64 h-64 bg-white border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                    <div className="relative w-64 h-64 bg-white border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
                       <div className="text-center">
                         <QRCode value={enrollmentQR} size={200} className="mx-auto mb-4" />
                         <p className="text-sm text-gray-600">QR Code Preview</p>
                       </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="absolute top-2 right-2 bg-white/90 hover:bg-white"
+                        onClick={() => openQrPreview(enrollmentQR, "Enrollment QR Code")}
+                      >
+                        <ZoomIn className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
 
@@ -270,7 +288,7 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="flex justify-center">
-                    <div className="w-64 h-64 bg-white border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                    <div className="relative w-64 h-64 bg-white border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
                       <div className="text-center">
                         <QRCode value={attendanceQR} size={200} className="mx-auto mb-4" />
                         <p className="text-sm text-gray-600">QR Code Preview</p>
@@ -278,6 +296,14 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                           Session: {new Date().toLocaleDateString()}
                         </Badge>
                       </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="absolute top-2 right-2 bg-white/90 hover:bg-white"
+                        onClick={() => openQrPreview(attendanceQR, "Attendance QR Code")}
+                      >
+                        <ZoomIn className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
 
@@ -376,7 +402,7 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="flex justify-center">
-                    <div className="w-64 h-64 bg-white border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                    <div className="relative w-64 h-64 bg-white border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
                       <div className="text-center">
                         <QRCode value={attendanceOutQR} size={200} className="mx-auto mb-4" />
                         <p className="text-sm text-gray-600">QR Code Preview</p>
@@ -384,6 +410,14 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                           Session: {new Date().toLocaleDateString()}
                         </Badge>
                       </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="absolute top-2 right-2 bg-white/90 hover:bg-white"
+                        onClick={() => openQrPreview(attendanceOutQR, "Attendance Out QR Code")}
+                      >
+                        <ZoomIn className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
 
@@ -426,6 +460,44 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
           </Tabs>
         </div>
       </main>
+      
+      {/* QR Preview Modal */}
+      <Dialog open={qrPreviewOpen} onOpenChange={setQrPreviewOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span>{previewQrTitle}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setQrPreviewOpen(false)}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col items-center space-y-4">
+            <div className="bg-white p-4 rounded-lg border">
+              <QRCode value={previewQrData} size={300} />
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-gray-600 mb-2">Scan this QR code with your device</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => copyToClipboard(previewQrData, "preview")}
+              >
+                {copied === "preview" ? (
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                ) : (
+                  <Copy className="w-4 h-4 mr-2" />
+                )}
+                Copy QR Data
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       
       {/* Footer */}
       <footer className="bg-white border-t mt-auto py-4 flex-shrink-0">
