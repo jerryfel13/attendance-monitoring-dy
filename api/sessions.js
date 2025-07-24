@@ -25,6 +25,12 @@ export default async function handler(req, res) {
         [session.subject_id]
       );
       
+      // First, update all pending records to absent
+      await pool.query(
+        'UPDATE attendance_records SET status = $1 WHERE session_id = $2 AND status = $3',
+        ['absent', id, 'pending']
+      );
+      
       // Get students who already marked attendance with final status
       const markedStudents = await pool.query(
         'SELECT ar.student_id, ar.status FROM attendance_records ar WHERE ar.session_id = $1',
@@ -35,32 +41,17 @@ export default async function handler(req, res) {
         .filter(row => ['present', 'late', 'absent'].includes(row.status))
         .map(row => row.student_id);
       
-      // Find students who didn't mark attendance or only have pending status (absent)
+      // Find students who didn't mark attendance at all
       const absentStudents = enrolledStudents.rows.filter(
         student => !finalStatusStudentIds.includes(student.student_id)
       );
       
-      // Mark absent students (including those with pending status)
+      // Create absent records for students who never scanned in
       for (const student of absentStudents) {
-        // Check if student has a pending record
-        const pendingRecord = await pool.query(
-          'SELECT id FROM attendance_records WHERE session_id = $1 AND student_id = $2 AND status = $3',
-          [id, student.student_id, 'pending']
+        await pool.query(
+          'INSERT INTO attendance_records (session_id, student_id, status) VALUES ($1, $2, $3)',
+          [id, student.student_id, 'absent']
         );
-        
-        if (pendingRecord.rows.length > 0) {
-          // Update pending record to absent
-          await pool.query(
-            'UPDATE attendance_records SET status = $1 WHERE session_id = $2 AND student_id = $3',
-            ['absent', id, student.student_id]
-          );
-        } else {
-          // Create new absent record
-          await pool.query(
-            'INSERT INTO attendance_records (session_id, student_id, status) VALUES ($1, $2, $3)',
-            [id, student.student_id, 'absent']
-          );
-        }
       }
       
       // Deactivate the session
