@@ -162,45 +162,15 @@ export default async function handler(req, res) {
           });
         }
         
-        // Determine attendance status (present or late) during scan-in
-        const sessionData = await pool.query(
-          'SELECT s.session_time, s.session_date, sub.late_threshold, sub.start_time FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
-          [sessionId]
-        );
-        
-        if (sessionData.rows.length === 0) {
-          return res.status(404).json({ 
-            type: 'attendance',
-            message: 'Session data not found',
-            success: false 
-          });
-        }
-        
-        const session = sessionData.rows[0];
-        const lateThreshold = session.late_threshold || 15; // Default 15 minutes
-        
-        // Parse subject's scheduled start time and current time
-        const scheduledStartTime = new Date(`${session.session_date}T${session.start_time}`);
-        const currentTime = new Date();
-        const timeDifference = (currentTime.getTime() - scheduledStartTime.getTime()) / (1000 * 60); // Difference in minutes
-        
-        let attendanceStatus = 'present';
-        let statusMessage = 'Scan-in successful. Please scan out at the end of class to confirm your attendance.';
-        
-        if (timeDifference > lateThreshold) {
-          attendanceStatus = 'late';
-          statusMessage = `Scan-in successful (LATE - ${Math.round(timeDifference)} minutes after scheduled start). Please scan out at the end of class.`;
-        }
-        
-        // Insert with appropriate status
+        // Mark attendance as pending initially (will be finalized on scan-out)
         await pool.query(
           'INSERT INTO attendance_records (session_id, student_id, status, check_in_time) VALUES ($1, $2, $3, NOW())',
-          [sessionId, studentId, attendanceStatus]
+          [sessionId, studentId, 'pending']
         );
         
         return res.json({
           type: 'attendance',
-          message: statusMessage,
+          message: 'Scan-in successful. Please scan out at the end of class to confirm your attendance.',
           success: true
         });
       } else if (qrCode.startsWith("ATTENDANCE_OUT_")) {

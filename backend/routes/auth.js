@@ -72,22 +72,24 @@ router.get('/teacher/subjects', async (req, res) => {
         [subject.id]
       );
       const students = parseInt(studentsResult.rows[0].count, 10);
-      // Get attendance stats
+      // Get attendance stats - only count as present if check_out_time exists
       const attendanceStats = await pool.query(
         `SELECT 
-          COUNT(*) FILTER (WHERE status = 'late') AS late,
+          COUNT(*) FILTER (WHERE status = 'late' AND check_out_time IS NOT NULL) AS late,
           COUNT(*) FILTER (WHERE status = 'absent') AS absent,
+          COUNT(*) FILTER (WHERE status = 'present' AND check_out_time IS NOT NULL) AS present,
           COUNT(*) AS total
         FROM attendance_records ar
         JOIN attendance_sessions s ON ar.session_id = s.id
         WHERE s.subject_id = $1`,
         [subject.id]
       );
-      const { late, absent, total } = attendanceStats.rows[0];
-      // Calculate attendance rate
+      const { late, absent, present, total } = attendanceStats.rows[0];
+      // Calculate attendance rate - only count completed attendance (with check_out_time)
       let attendanceRate = 100;
       if (total > 0) {
-        attendanceRate = Math.round(((total - absent) / total) * 100);
+        const completedAttendance = parseInt(present, 10) + parseInt(late, 10);
+        attendanceRate = Math.round((completedAttendance / total) * 100);
       }
       // Format schedule string
       let schedule = '';
@@ -154,12 +156,12 @@ router.get('/subjects/:id/students', async (req, res) => {
       SELECT 
         u.id, u.name, u.email, u.student_id,
         COUNT(ar.id) as total_sessions,
-        COUNT(ar.id) FILTER (WHERE ar.status = 'present') as present_sessions,
-        COUNT(ar.id) FILTER (WHERE ar.status = 'late') as late_sessions,
+        COUNT(ar.id) FILTER (WHERE ar.status = 'present' AND ar.check_out_time IS NOT NULL) as present_sessions,
+        COUNT(ar.id) FILTER (WHERE ar.status = 'late' AND ar.check_out_time IS NOT NULL) as late_sessions,
         COUNT(ar.id) FILTER (WHERE ar.status = 'absent') as absent_sessions,
         COALESCE(
           ROUND(
-            (COUNT(ar.id) FILTER (WHERE ar.status IN ('present', 'late')) * 100.0 / 
+            (COUNT(ar.id) FILTER (WHERE ar.status IN ('present', 'late') AND ar.check_out_time IS NOT NULL) * 100.0 / 
              NULLIF(COUNT(ar.id), 0)
             )::integer
           ), 0
@@ -186,12 +188,12 @@ router.get('/subjects/:id/sessions', async (req, res) => {
       SELECT 
         s.id, s.session_date, s.session_time,
         COUNT(ar.id) as total_students,
-        COUNT(ar.id) FILTER (WHERE ar.status = 'present') as present_count,
-        COUNT(ar.id) FILTER (WHERE ar.status = 'late') as late_count,
+        COUNT(ar.id) FILTER (WHERE ar.status = 'present' AND ar.check_out_time IS NOT NULL) as present_count,
+        COUNT(ar.id) FILTER (WHERE ar.status = 'late' AND ar.check_out_time IS NOT NULL) as late_count,
         COUNT(ar.id) FILTER (WHERE ar.status = 'absent') as absent_count,
         COALESCE(
           ROUND(
-            (COUNT(ar.id) FILTER (WHERE ar.status IN ('present', 'late')) * 100.0 / 
+            (COUNT(ar.id) FILTER (WHERE ar.status IN ('present', 'late') AND ar.check_out_time IS NOT NULL) * 100.0 / 
              NULLIF(COUNT(ar.id), 0)
             )::integer
           ), 0
@@ -432,7 +434,7 @@ router.get('/student/subjects', async (req, res) => {
         COALESCE(
           (SELECT 
             ROUND(
-              (COUNT(ar.id) FILTER (WHERE ar.status IN ('present', 'late')) * 100.0 / 
+              (COUNT(ar.id) FILTER (WHERE ar.status IN ('present', 'late') AND ar.check_out_time IS NOT NULL) * 100.0 / 
                NULLIF(COUNT(ar.id), 0)
               )::integer
             )
@@ -484,12 +486,12 @@ router.get('/student/:id', async (req, res) => {
         u.id, u.name, u.email, u.student_id,
         COUNT(DISTINCT e.subject_id) as enrolled_subjects,
         COUNT(ar.id) as total_sessions,
-        COUNT(ar.id) FILTER (WHERE ar.status = 'present') as present_sessions,
-        COUNT(ar.id) FILTER (WHERE ar.status = 'late') as late_sessions,
+        COUNT(ar.id) FILTER (WHERE ar.status = 'present' AND ar.check_out_time IS NOT NULL) as present_sessions,
+        COUNT(ar.id) FILTER (WHERE ar.status = 'late' AND ar.check_out_time IS NOT NULL) as late_sessions,
         COUNT(ar.id) FILTER (WHERE ar.status = 'absent') as absent_sessions,
         CASE 
           WHEN COUNT(ar.id) > 0 THEN 
-            ROUND((COUNT(ar.id) FILTER (WHERE ar.status IN ('present', 'late')) * 100.0 / COUNT(ar.id))::integer
+            ROUND((COUNT(ar.id) FILTER (WHERE ar.status IN ('present', 'late') AND ar.check_out_time IS NOT NULL) * 100.0 / COUNT(ar.id))::integer
           ELSE 0 
         END as overall_attendance_rate
       FROM users u
@@ -643,45 +645,15 @@ router.post('/scan', async (req, res) => {
         });
       }
       
-      // Determine attendance status (present or late)
-      const sessionData = await pool.query(
-        'SELECT s.session_time, s.session_date, sub.late_threshold, sub.start_time FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
-        [sessionId]
-      );
-      
-      if (sessionData.rows.length === 0) {
-        return res.status(404).json({ 
-          type: 'attendance',
-          message: 'Session data not found',
-          success: false 
-        });
-      }
-      
-      const session = sessionData.rows[0];
-      const lateThreshold = session.late_threshold || 15; // Default 15 minutes
-      
-      // Parse subject's scheduled start time and current time
-      const scheduledStartTime = new Date(`${session.session_date}T${session.start_time}`);
-      const currentTime = new Date();
-      const timeDifference = (currentTime.getTime() - scheduledStartTime.getTime()) / (1000 * 60); // Difference in minutes
-      
-      let attendanceStatus = 'present';
-      let statusMessage = 'Attendance marked';
-      
-      if (timeDifference > lateThreshold) {
-        attendanceStatus = 'late';
-        statusMessage = `Attendance marked (LATE - ${Math.round(timeDifference)} minutes after scheduled start)`;
-      }
-      
-      // Mark attendance with appropriate status
+      // Mark attendance as pending initially (will be finalized on scan-out)
       await pool.query(
         'INSERT INTO attendance_records (session_id, student_id, status) VALUES ($1, $2, $3)',
-        [sessionId, studentId, attendanceStatus]
+        [sessionId, studentId, 'pending']
       );
       
       res.json({
         type: 'attendance',
-        message: `${statusMessage} for ${subjectName} (${subjectCode}) at ${new Date().toLocaleTimeString()}`,
+        message: `Attendance marked for ${subjectName} (${subjectCode}) at ${new Date().toLocaleTimeString()}. Please scan out at the end of class.`,
         success: true
       });
       
