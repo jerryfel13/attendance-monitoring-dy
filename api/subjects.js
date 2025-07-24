@@ -264,6 +264,46 @@ export default async function handler(req, res) {
     }
   }
 
+  // Delete a subject
+  if (route === 'delete' && req.method === 'DELETE' && id) {
+    try {
+      // Check if subject exists and get teacher_id for verification
+      const subjectCheck = await pool.query(
+        'SELECT id, name, teacher_id FROM subjects WHERE id = $1',
+        [id]
+      );
+      
+      if (subjectCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Subject not found' });
+      }
+
+      const subject = subjectCheck.rows[0];
+      
+      // Optional: Add teacher verification here if needed
+      // const userData = localStorage.getItem("user");
+      // const user = JSON.parse(userData);
+      // if (subject.teacher_id !== user.id) {
+      //   return res.status(403).json({ error: 'Unauthorized to delete this subject' });
+      // }
+
+      // Delete related records first (due to foreign key constraints)
+      await pool.query('DELETE FROM attendance_records WHERE session_id IN (SELECT id FROM attendance_sessions WHERE subject_id = $1)', [id]);
+      await pool.query('DELETE FROM attendance_sessions WHERE subject_id = $1', [id]);
+      await pool.query('DELETE FROM manual_attendance_codes WHERE session_id IN (SELECT id FROM attendance_sessions WHERE subject_id = $1)', [id]);
+      await pool.query('DELETE FROM enrollments WHERE subject_id = $1', [id]);
+      
+      // Finally delete the subject
+      await pool.query('DELETE FROM subjects WHERE id = $1', [id]);
+      
+      return res.json({ 
+        message: 'Subject deleted successfully',
+        deletedSubject: { id: subject.id, name: subject.name }
+      });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to delete subject', details: err.message });
+    }
+  }
+
   // Default: Not found
   return res.status(404).json({ error: 'Not found' });
 } 

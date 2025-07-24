@@ -79,6 +79,9 @@ export const apiClient = {
       method: 'PUT',
     }),
     getActiveSession: (id: string) => apiClient.request(`/subjects?route=active-session&id=${id}`),
+    deleteSubject: (id: string) => apiClient.request(`/subjects?route=delete&id=${id}`, {
+      method: 'DELETE',
+    }),
   },
   student: {
     getSubjects: (studentId: string) => apiClient.request(`/subjects?route=student-subjects&studentId=${studentId}`),

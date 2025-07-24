@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Users, BookOpen, Clock, AlertTriangle, User, LogOut, Plus, QrCode } from "lucide-react"
+import { Users, BookOpen, Clock, AlertTriangle, User, LogOut, Plus, QrCode, MoreVertical, Edit, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { apiClient } from "@/lib/api"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { useToast } from "@/hooks/use-toast"
 
 interface Subject {
   id: string
@@ -23,7 +25,9 @@ interface Subject {
 export default function TeacherDashboard() {
   const [user, setUser] = useState<any>(null)
   const [subjects, setSubjects] = useState<Subject[]>([])
+  const [deletingSubjectId, setDeletingSubjectId] = useState<string | null>(null)
   const router = useRouter()
+  const { toast } = useToast()
 
   useEffect(() => {
     const userData = localStorage.getItem("user")
@@ -51,6 +55,37 @@ export default function TeacherDashboard() {
   const handleLogout = () => {
     localStorage.removeItem("user")
     router.push("/")
+  }
+
+  const handleEditSubject = (subjectId: string) => {
+    // Navigate to edit page (you can create a separate edit page or use a modal)
+    router.push(`/teacher/edit-subject/${subjectId}`)
+  }
+
+  const handleDeleteSubject = async (subjectId: string, subjectName: string) => {
+    if (!confirm(`Are you sure you want to delete "${subjectName}"? This action cannot be undone.`)) {
+      return
+    }
+
+    setDeletingSubjectId(subjectId)
+    try {
+      await apiClient.teacher.deleteSubject(subjectId)
+      toast({
+        title: "Subject deleted",
+        description: `"${subjectName}" has been successfully deleted.`,
+      })
+      // Refresh subjects list
+      const updatedSubjects = subjects.filter(s => s.id !== subjectId)
+      setSubjects(updatedSubjects)
+    } catch (error: any) {
+      toast({
+        title: "Error deleting subject",
+        description: error.message || "Failed to delete subject",
+        variant: "destructive"
+      })
+    } finally {
+      setDeletingSubjectId(null)
+    }
   }
 
   if (!user) return null
@@ -143,9 +178,32 @@ export default function TeacherDashboard() {
                       <CardTitle className="text-lg">{subject.name}</CardTitle>
                       <CardDescription>{subject.code}</CardDescription>
                     </div>
-                    <Badge variant={typeof subject.attendanceRate === 'number' && !isNaN(subject.attendanceRate) && subject.attendanceRate >= 80 ? "default" : "destructive"}>
-                      {typeof subject.attendanceRate === 'number' && !isNaN(subject.attendanceRate) ? `${subject.attendanceRate}%` : '-'}
-                    </Badge>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant={typeof subject.attendanceRate === 'number' && !isNaN(subject.attendanceRate) && subject.attendanceRate >= 80 ? "default" : "destructive"}>
+                        {typeof subject.attendanceRate === 'number' && !isNaN(subject.attendanceRate) ? `${subject.attendanceRate}%` : '-'}
+                      </Badge>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditSubject(subject.id)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit Subject
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleDeleteSubject(subject.id, subject.name)}
+                            className="text-red-600 focus:text-red-600"
+                            disabled={deletingSubjectId === subject.id}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            {deletingSubjectId === subject.id ? 'Deleting...' : 'Delete Subject'}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
