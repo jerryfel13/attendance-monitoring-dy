@@ -7,9 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Users, Clock, Calendar, TrendingUp, AlertTriangle, User, LogOut, QrCode } from "lucide-react"
+import { ArrowLeft, Users, Clock, Calendar, TrendingUp, AlertTriangle, User, LogOut, QrCode, Search } from "lucide-react"
 import Link from "next/link"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { apiClient } from "@/lib/api"
 import { Select as ShadSelect, SelectTrigger, SelectContent, SelectItem } from "@/components/ui/select";
 import * as XLSX from "xlsx";
@@ -54,6 +55,7 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
   const [sessionAttendance, setSessionAttendance] = useState<any[]>([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [removingStudentId, setRemovingStudentId] = useState<number | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -231,6 +233,13 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
     ? Math.round(sessions.reduce((acc, s) => acc + (isNaN(s.attendance_rate) ? 0 : s.attendance_rate), 0) / sessions.length)
     : 0
 
+  // Filter students based on search term
+  const filteredStudents = students.filter(student =>
+    student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    student.student_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    student.email.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white shadow-sm border-b">
@@ -314,6 +323,20 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
                 <CardTitle>Enrolled Students</CardTitle>
                 <CardDescription>List of all students enrolled in this subject</CardDescription>
                 <div className="mt-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <Input
+                      placeholder="Search students by name, ID, or email..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <div className="mt-2 text-sm text-gray-600">
+                    Showing {filteredStudents.length} of {students.length} students
+                  </div>
+                </div>
+                <div className="mt-4">
                   <Label>Select Session for Manual Attendance Update</Label>
                   <select
                     className="border rounded px-2 py-1 ml-2"
@@ -346,7 +369,7 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {students.map((student) => (
+                    {filteredStudents.map((student) => (
                       <TableRow key={student.id}>
                         <TableCell className="font-medium">{student.name}</TableCell>
                         <TableCell>{student.student_id}</TableCell>
@@ -498,14 +521,12 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
                       Manage QR Codes
                     </Button>
                   </Link>
-                  <Button variant="outline" className="w-full">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    Create Session
-                  </Button>
-                  <Button variant="outline" className="w-full">
-                    <TrendingUp className="w-4 h-4 mr-2" />
-                    Generate Report
-                  </Button>
+                  <Link href={`/teacher/qr/${subject.id}`} className="w-full">
+                    <Button variant="outline" className="w-full">
+                      <Calendar className="w-4 h-4 mr-2" />
+                      Create Session
+                    </Button>
+                  </Link>
                 </CardContent>
               </Card>
             </div>
