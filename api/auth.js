@@ -493,7 +493,18 @@ export default async function handler(req, res) {
     }
     try {
       const result = await pool.query(`
-        SELECT u.id, u.name, u.email, u.student_id, ar.status, ar.check_in_time, ar.check_out_time
+        SELECT 
+          u.id, 
+          u.name, 
+          u.email, 
+          u.student_id, 
+          ar.check_in_time, 
+          ar.check_out_time,
+          CASE 
+            WHEN ar.status IS NULL THEN 'Not Scanned'
+            WHEN ar.check_out_time IS NULL AND ar.status IN ('present', 'late') THEN 'pending'
+            ELSE ar.status
+          END as status
         FROM enrollments e
         JOIN users u ON e.student_id = u.id
         LEFT JOIN attendance_records ar ON ar.session_id = $1 AND ar.student_id = u.id
