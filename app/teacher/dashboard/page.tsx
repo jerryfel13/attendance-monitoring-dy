@@ -9,6 +9,7 @@ import { Users, BookOpen, Clock, AlertTriangle, User, LogOut, Plus, QrCode, More
 import Link from "next/link"
 import { apiClient } from "@/lib/api"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 
 interface Subject {
@@ -26,6 +27,7 @@ export default function TeacherDashboard() {
   const [user, setUser] = useState<any>(null)
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [deletingSubjectId, setDeletingSubjectId] = useState<string | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ id: string; name: string } | null>(null)
   const router = useRouter()
   const { toast } = useToast()
 
@@ -63,11 +65,16 @@ export default function TeacherDashboard() {
   }
 
   const handleDeleteSubject = async (subjectId: string, subjectName: string) => {
-    if (!confirm(`Are you sure you want to delete "${subjectName}"? This action cannot be undone.`)) {
-      return
-    }
+    setShowDeleteConfirm({ id: subjectId, name: subjectName })
+  }
 
+  const confirmDelete = async () => {
+    if (!showDeleteConfirm) return
+
+    const { id: subjectId, name: subjectName } = showDeleteConfirm
     setDeletingSubjectId(subjectId)
+    setShowDeleteConfirm(null)
+    
     try {
       await apiClient.teacher.deleteSubject(subjectId)
       toast({
@@ -86,6 +93,10 @@ export default function TeacherDashboard() {
     } finally {
       setDeletingSubjectId(null)
     }
+  }
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(null)
   }
 
   if (!user) return null
@@ -249,6 +260,30 @@ export default function TeacherDashboard() {
           </div>
         </div>
       </main>
+      
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteConfirm !== null} onOpenChange={() => setShowDeleteConfirm(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Subject</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{showDeleteConfirm?.name}"? This action cannot be undone and will remove all associated data including enrollments, attendance records, and sessions.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelDelete}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDelete}
+              disabled={deletingSubjectId === showDeleteConfirm?.id}
+            >
+              {deletingSubjectId === showDeleteConfirm?.id ? "Deleting..." : "Delete Subject"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       {/* Footer */}
       <footer className="bg-white border-t mt-auto py-4 flex-shrink-0">

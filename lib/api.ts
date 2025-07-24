@@ -82,6 +82,10 @@ export const apiClient = {
     deleteSubject: (id: string) => apiClient.request(`/subjects?route=delete&id=${id}`, {
       method: 'DELETE',
     }),
+    updateSubject: (id: string, data: any) => apiClient.request(`/subjects?route=update&id=${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
   },
   student: {
     getSubjects: (studentId: string) => apiClient.request(`/subjects?route=student-subjects&studentId=${studentId}`),

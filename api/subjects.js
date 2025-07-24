@@ -264,6 +264,52 @@ export default async function handler(req, res) {
     }
   }
 
+  // Update a subject
+  if (route === 'update' && req.method === 'PUT' && id) {
+    const { name, code, description, schedule_days, start_time, end_time, late_threshold } = req.body;
+    if (!name || !code || !schedule_days || !start_time || !end_time) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    try {
+      // Check if subject exists
+      const subjectCheck = await pool.query(
+        'SELECT id, name FROM subjects WHERE id = $1',
+        [id]
+      );
+      
+      if (subjectCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Subject not found' });
+      }
+
+      // Check if code is already taken by another subject
+      const codeCheck = await pool.query(
+        'SELECT id FROM subjects WHERE code = $1 AND id != $2',
+        [code, id]
+      );
+      
+      if (codeCheck.rows.length > 0) {
+        return res.status(409).json({ error: 'Subject code already exists' });
+      }
+
+      // Update the subject
+      const result = await pool.query(
+        `UPDATE subjects 
+         SET name = $1, code = $2, description = $3, schedule_days = $4, 
+             start_time = $5, end_time = $6, late_threshold = $7, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $8 
+         RETURNING id, name, code, description, schedule_days, start_time, end_time, late_threshold`,
+        [name, code, description || null, schedule_days, start_time, end_time, late_threshold || 15, id]
+      );
+      
+      return res.json({ 
+        message: 'Subject updated successfully',
+        subject: result.rows[0]
+      });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to update subject', details: err.message });
+    }
+  }
+
   // Delete a subject
   if (route === 'delete' && req.method === 'DELETE' && id) {
     try {
