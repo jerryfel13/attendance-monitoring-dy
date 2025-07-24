@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { ArrowLeft, QrCode, CheckCircle } from "lucide-react"
+import { ArrowLeft, QrCode, CheckCircle, Plus } from "lucide-react"
 import Link from "next/link"
 import { apiClient } from "@/lib/api"
 
@@ -21,11 +21,12 @@ export default function CreateSubjectPage() {
     code: "",
     description: "",
     schedule: "",
-    startTime: "",
-    endTime: "",
     days: [] as string[],
     lateThreshold: "15",
   })
+  const [timeSlots, setTimeSlots] = useState([
+    { startTime: "", endTime: "", days: [] as string[] }
+  ])
   const [isLoading, setIsLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [qrCode, setQrCode] = useState("")
@@ -50,6 +51,31 @@ export default function CreateSubjectPage() {
     }))
   }
 
+  const handleTimeSlotChange = (index: number, field: string, value: string) => {
+    setTimeSlots(prev => prev.map((slot, i) => 
+      i === index ? { ...slot, [field]: value } : slot
+    ))
+  }
+
+  const handleTimeSlotDayToggle = (slotIndex: number, day: string) => {
+    setTimeSlots(prev => prev.map((slot, i) => 
+      i === slotIndex ? {
+        ...slot,
+        days: slot.days.includes(day) ? slot.days.filter((d) => d !== day) : [...slot.days, day]
+      } : slot
+    ))
+  }
+
+  const addTimeSlot = () => {
+    setTimeSlots(prev => [...prev, { startTime: "", endTime: "", days: [] }])
+  }
+
+  const removeTimeSlot = (index: number) => {
+    if (timeSlots.length > 1) {
+      setTimeSlots(prev => prev.filter((_, i) => i !== index))
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
@@ -62,14 +88,28 @@ export default function CreateSubjectPage() {
       }
       const user = JSON.parse(userData)
 
+      // Validate that at least one time slot has complete information
+      const validTimeSlots = timeSlots.filter(slot => 
+        slot.startTime && slot.endTime && slot.days.length > 0
+      )
+      
+      if (validTimeSlots.length === 0) {
+        alert("Please add at least one complete time slot with days selected")
+        return
+      }
+
+      // For now, we'll use the first time slot for the main subject creation
+      // In a full implementation, you might want to create multiple subjects or modify the backend
+      const firstSlot = validTimeSlots[0]
+      
       const data = await apiClient.teacher.createSubject({
         name: formData.name,
         code: formData.code,
         description: formData.description,
         teacher_id: user.id,
-        schedule_days: formData.days,
-        start_time: formData.startTime,
-        end_time: formData.endTime,
+        schedule_days: firstSlot.days,
+        start_time: firstSlot.startTime,
+        end_time: firstSlot.endTime,
         late_threshold: parseInt(formData.lateThreshold),
       })
       if (!data || !data.subject) {
@@ -223,43 +263,74 @@ export default function CreateSubjectPage() {
                 </div>
 
                 <div className="space-y-4">
-                  <Label>Class Schedule</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {days.map((day) => (
-                      <Button
-                        key={day}
-                        type="button"
-                        variant={formData.days.includes(day) ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => handleDayToggle(day)}
-                      >
-                        {day.slice(0, 3)}
-                      </Button>
-                    ))}
+                  <div className="flex items-center justify-between">
+                    <Label>Class Schedule</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addTimeSlot}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Time Slot
+                    </Button>
                   </div>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="startTime">Start Time</Label>
-                    <Input
-                      id="startTime"
-                      type="time"
-                      value={formData.startTime}
-                      onChange={(e) => handleInputChange("startTime", e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="endTime">End Time</Label>
-                    <Input
-                      id="endTime"
-                      type="time"
-                      value={formData.endTime}
-                      onChange={(e) => handleInputChange("endTime", e.target.value)}
-                      required
-                    />
-                  </div>
+                  
+                  {timeSlots.map((slot, index) => (
+                    <div key={index} className="border rounded-lg p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Label>Time Slot {index + 1}</Label>
+                        {timeSlots.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => removeTimeSlot(index)}
+                          >
+                            Remove
+                          </Button>
+                        )}
+                      </div>
+                      
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Start Time</Label>
+                          <Input
+                            type="time"
+                            value={slot.startTime}
+                            onChange={(e) => handleTimeSlotChange(index, "startTime", e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>End Time</Label>
+                          <Input
+                            type="time"
+                            value={slot.endTime}
+                            onChange={(e) => handleTimeSlotChange(index, "endTime", e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>Days</Label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {days.map((day) => (
+                            <Button
+                              key={day}
+                              type="button"
+                              variant={slot.days.includes(day) ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handleTimeSlotDayToggle(index, day)}
+                            >
+                              {day.slice(0, 3)}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="space-y-2">
