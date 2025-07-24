@@ -219,7 +219,7 @@ export default function ScanPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white shadow-sm border-b">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center space-x-4">
@@ -236,7 +236,7 @@ export default function ScanPage() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 flex-1">
         <div className="max-w-md mx-auto space-y-6">
           <Card>
             <CardHeader className="text-center">
@@ -318,6 +318,15 @@ export default function ScanPage() {
           </Card>
         </div>
       </main>
+      
+      {/* Footer */}
+      <footer className="bg-white border-t mt-auto py-4 flex-shrink-0">
+        <div className="container mx-auto px-4">
+          <div className="text-center text-sm text-gray-600">
+            © 2024 Jerryfel Laraga. All rights reserved.
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

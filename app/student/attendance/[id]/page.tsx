@@ -50,66 +50,77 @@ export default function StudentAttendanceDetails({ params }: { params: { id: str
     : attendance;
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6">
-        <Button 
-          variant="ghost" 
-          onClick={() => router.push("/student/dashboard")}
-          className="flex items-center gap-2"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Dashboard
-        </Button>
-      </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Attendance Details - {subject?.name || "Subject"}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4 flex items-center space-x-4">
-            <span>Filter by Session:</span>
-            <Select value={selectedSession} onValueChange={setSelectedSession}>
-              <SelectTrigger className="w-64">
-                <SelectValue placeholder="All Sessions" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Sessions</SelectItem>
-                {sessions.map((session: any) => (
-                  <SelectItem key={session.id} value={session.id}>
-                    {session.session_date} {session.session_time}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <main className="container mx-auto px-4 py-8 flex-1">
+        <div className="mb-6">
+          <Button 
+            variant="ghost" 
+            onClick={() => router.push("/student/dashboard")}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Dashboard
+          </Button>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Attendance Details - {subject?.name || "Subject"}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4 flex items-center space-x-4">
+              <span>Filter by Session:</span>
+              <Select value={selectedSession} onValueChange={setSelectedSession}>
+                <SelectTrigger className="w-64">
+                  <SelectValue placeholder="All Sessions" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sessions</SelectItem>
+                  {sessions.map((session: any) => (
+                    <SelectItem key={session.id} value={session.id}>
+                      {session.session_date} {session.session_time}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm border">
+                <thead>
+                  <tr>
+                    <th className="border px-2 py-1">Date</th>
+                    <th className="border px-2 py-1">Time</th>
+                    <th className="border px-2 py-1">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr><td colSpan={3} className="text-center">Loading...</td></tr>
+                  ) : filteredAttendance.length === 0 ? (
+                    <tr><td colSpan={3} className="text-center">No attendance records found.</td></tr>
+                  ) : (
+                    filteredAttendance.map((record: any) => (
+                      <tr key={record.id}>
+                        <td className="border px-2 py-1">{record.formatted_date || record.session_date}</td>
+                        <td className="border px-2 py-1">{record.formatted_time || record.session_time}</td>
+                        <td className="border px-2 py-1">{record.status}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </main>
+      
+      {/* Footer */}
+      <footer className="bg-white border-t mt-auto py-4 flex-shrink-0">
+        <div className="container mx-auto px-4">
+          <div className="text-center text-sm text-gray-600">
+            © 2024 Jerryfel Laraga. All rights reserved.
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm border">
-              <thead>
-                <tr>
-                  <th className="border px-2 py-1">Date</th>
-                  <th className="border px-2 py-1">Time</th>
-                  <th className="border px-2 py-1">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={3} className="text-center">Loading...</td></tr>
-                ) : filteredAttendance.length === 0 ? (
-                  <tr><td colSpan={3} className="text-center">No attendance records found.</td></tr>
-                ) : (
-                  filteredAttendance.map((record: any) => (
-                    <tr key={record.id}>
-                      <td className="border px-2 py-1">{record.formatted_date || record.session_date}</td>
-                      <td className="border px-2 py-1">{record.formatted_time || record.session_time}</td>
-                      <td className="border px-2 py-1">{record.status}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </footer>
     </div>
   );
 } 
