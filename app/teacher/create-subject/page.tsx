@@ -11,8 +11,10 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { ArrowLeft, QrCode, CheckCircle } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ArrowLeft, QrCode, CheckCircle, ZoomIn, Copy } from "lucide-react"
 import Link from "next/link"
+import QRCode from 'react-qr-code'
 import { apiClient } from "@/lib/api"
 
 export default function CreateSubjectPage() {
@@ -29,6 +31,8 @@ export default function CreateSubjectPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [qrCode, setQrCode] = useState("")
+  const [qrPreviewOpen, setQrPreviewOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -77,8 +81,8 @@ export default function CreateSubjectPage() {
         return
       }
 
-      // Generate QR code data
-      const qrData = `SUBJECT:${formData.name} (${formData.code})`
+      // Generate QR code data using the same format as teacher QR page
+      const qrData = `SUBJECT_${formData.name.replace(/\s+/g, '_')}_${formData.code}`
       setQrCode(qrData)
       setSuccess(true)
     } catch (error) {
@@ -86,6 +90,20 @@ export default function CreateSubjectPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error("Failed to copy text")
+    }
+  }
+
+  const openQrPreview = () => {
+    setQrPreviewOpen(true)
   }
 
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
@@ -122,11 +140,34 @@ export default function CreateSubjectPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="bg-gray-50 p-4 rounded-lg text-center">
-                  <div className="w-32 h-32 bg-white border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mx-auto mb-4">
-                    <QrCode className="w-16 h-16 text-gray-400" />
+                  <div className="relative w-32 h-32 bg-white border-2 border-gray-200 rounded-lg flex items-center justify-center mx-auto mb-4">
+                    <QRCode 
+                      value={qrCode}
+                      size={120}
+                      level="H"
+                      className="w-full h-full"
+                    />
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="absolute -top-2 -right-2 w-8 h-8 bg-white border shadow-sm hover:bg-gray-50"
+                      onClick={openQrPreview}
+                    >
+                      <ZoomIn className="w-4 h-4" />
+                    </Button>
                   </div>
                   <p className="text-sm font-medium mb-2">Enrollment QR Code</p>
-                  <p className="text-xs text-gray-600 break-all bg-white p-2 rounded border">{qrCode}</p>
+                  <div className="flex items-center justify-center space-x-2">
+                    <p className="text-xs text-gray-600 break-all bg-white p-2 rounded border flex-1">{qrCode}</p>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="w-8 h-8"
+                      onClick={() => copyToClipboard(qrCode)}
+                    >
+                      <Copy className={`w-4 h-4 ${copied ? 'text-green-600' : 'text-gray-500'}`} />
+                    </Button>
+                  </div>
                 </div>
 
                 <Alert>
@@ -141,14 +182,39 @@ export default function CreateSubjectPage() {
                       Back to Dashboard
                     </Button>
                   </Link>
-                  <Link href={`/teacher/qr/${Date.now()}`} className="flex-1">
-                    <Button className="w-full">Manage QR Codes</Button>
-                  </Link>
                 </div>
               </CardContent>
             </Card>
           </div>
         </main>
+        
+        {/* QR Preview Dialog */}
+        <Dialog open={qrPreviewOpen} onOpenChange={setQrPreviewOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Enrollment QR Code</DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col items-center space-y-4">
+              <div className="bg-white p-4 rounded-lg border">
+                <QRCode 
+                  value={qrCode}
+                  size={200}
+                  level="H"
+                />
+              </div>
+              <div className="flex items-center space-x-2 w-full">
+                <p className="text-sm text-gray-600 break-all bg-gray-50 p-2 rounded border flex-1">{qrCode}</p>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => copyToClipboard(qrCode)}
+                >
+                  <Copy className={`w-4 h-4 ${copied ? 'text-green-600' : 'text-gray-500'}`} />
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
         
         {/* Footer */}
         <footer className="bg-white border-t mt-auto py-4 flex-shrink-0">
