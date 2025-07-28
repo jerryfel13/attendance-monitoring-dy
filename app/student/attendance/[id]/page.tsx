@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectItem, SelectTrigger, SelectContent, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
 import { apiClient } from "@/lib/api";
 
@@ -48,6 +49,52 @@ export default function StudentAttendanceDetails({ params }: { params: { id: str
   const filteredAttendance = selectedSession && selectedSession !== "all"
     ? attendance.filter((a: any) => a.session_id === selectedSession)
     : attendance;
+
+  // Skeleton loading component
+  const AttendanceSkeleton = () => (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <main className="container mx-auto px-4 py-8 flex-1">
+        <div className="mb-6">
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-48 mb-2" />
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4 flex items-center space-x-4">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-10 w-64" />
+            </div>
+            <div className="space-y-2">
+              <div className="flex space-x-2">
+                <Skeleton className="h-8 flex-1" />
+                <Skeleton className="h-8 flex-1" />
+                <Skeleton className="h-8 flex-1" />
+              </div>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex space-x-2">
+                  <Skeleton className="h-8 flex-1" />
+                  <Skeleton className="h-8 flex-1" />
+                  <Skeleton className="h-8 flex-1" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </main>
+      
+      <footer className="bg-white border-t mt-auto py-4 flex-shrink-0">
+        <div className="container mx-auto px-4">
+          <div className="text-center text-sm text-gray-600">
+            © 2024 Jerryfel Laraga. All rights reserved.
+          </div>
+        </div>
+      </footer>
+    </div>
+  )
+
+  if (loading) return <AttendanceSkeleton />
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">

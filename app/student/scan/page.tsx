@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Camera, QrCode, ArrowLeft, CheckCircle, X } from "lucide-react"
 import Link from "next/link"
 import { Html5QrcodeScanner } from "html5-qrcode"
@@ -18,6 +19,7 @@ export default function ScanPage() {
   const [isScanning, setIsScanning] = useState(false)
   const [isCameraActive, setIsCameraActive] = useState(false)
   const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
   const scannerRef = useRef<Html5QrcodeScanner | null>(null)
   const router = useRouter()
   const [manualCode, setManualCode] = useState("");
@@ -38,6 +40,7 @@ export default function ScanPage() {
     }
 
     setUser(parsedUser)
+    setLoading(false)
   }, [router])
 
   const startCamera = () => {
@@ -158,6 +161,58 @@ export default function ScanPage() {
     setQrCode(randomQR)
   }
 
+  // Skeleton loading component
+  const ScanSkeleton = () => (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <header className="bg-white shadow-sm border-b">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center space-x-4">
+            <Skeleton className="w-10 h-10" />
+            <div>
+              <Skeleton className="h-6 w-32 mb-1" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 py-8 flex-1">
+        <div className="max-w-md mx-auto">
+          <Card>
+            <CardHeader className="text-center">
+              <Skeleton className="w-16 h-16 rounded-full mx-auto mb-4" />
+              <Skeleton className="h-6 w-32 mb-2" />
+              <Skeleton className="h-4 w-48" />
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <Skeleton className="h-48 w-full rounded-lg" />
+                <div className="flex space-x-2">
+                  <Skeleton className="h-10 flex-1" />
+                  <Skeleton className="h-10 flex-1" />
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <Skeleton className="h-5 w-24" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+      
+      <footer className="bg-white border-t mt-auto py-4 flex-shrink-0">
+        <div className="container mx-auto px-4">
+          <div className="text-center text-sm text-gray-600">
+            © 2024 Jerryfel Laraga. All rights reserved.
+          </div>
+        </div>
+      </footer>
+    </div>
+  )
+
   const handleManualCode = async () => {
     if (!manualCode.trim() || !user?.id) return;
     setManualSubmitting(true);
@@ -217,6 +272,9 @@ export default function ScanPage() {
       }
     }
   }, [])
+
+  if (!user) return null
+  if (loading) return <ScanSkeleton />
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">

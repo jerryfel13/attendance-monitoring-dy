@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Skeleton } from "@/components/ui/skeleton"
 import { ArrowLeft, QrCode, Download, RefreshCw, Copy, CheckCircle, ZoomIn, X } from "lucide-react"
 import Link from "next/link"
 import QRCode from 'react-qr-code'
@@ -16,6 +17,7 @@ import { apiClient } from "@/lib/api"
 export default function QRManagementPage({ params }: { params: Promise<{ id: string }> }) {
   const [id, setId] = useState<string>("");
   const [subject, setSubject] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
   const [enrollmentQR, setEnrollmentQR] = useState("")
   const [attendanceQR, setAttendanceQR] = useState("")
   const [attendanceOutQR, setAttendanceOutQR] = useState("");
@@ -54,6 +56,7 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
         setAttendanceOutQR(`ATTENDANCE_OUT_${data.subject.name.replace(/\s+/g, '_')}_${data.subject.code}_${new Date().toISOString().split('T')[0]}`)
       })
       .catch(() => setSubject(null))
+      .finally(() => setLoading(false))
     // Check for active session
     checkActiveSession()
   }, [id, router])
@@ -155,7 +158,66 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
     setQrPreviewOpen(true);
   }
 
+  // Skeleton loading component
+  const QRSkeleton = () => (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <header className="bg-white shadow-sm border-b flex-shrink-0">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center space-x-4">
+            <Skeleton className="w-10 h-10" />
+            <div>
+              <Skeleton className="h-6 w-32 mb-1" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 py-8 flex-1 pb-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="grid lg:grid-cols-3 gap-6 mb-8">
+            {[1, 2, 3].map((i) => (
+              <Card key={i}>
+                <CardHeader className="pb-2">
+                  <Skeleton className="h-4 w-24" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-8 w-16" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="space-y-6">
+            <Skeleton className="h-10 w-full" />
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-48 mb-2" />
+                <Skeleton className="h-4 w-64" />
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex justify-center">
+                  <Skeleton className="w-64 h-64 rounded-lg" />
+                </div>
+                <Skeleton className="h-20 w-full" />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </main>
+      
+      <footer className="bg-white border-t mt-auto py-4 flex-shrink-0">
+        <div className="container mx-auto px-4">
+          <div className="text-center text-sm text-gray-600">
+            © 2024 Jerryfel Laraga. All rights reserved.
+          </div>
+        </div>
+      </footer>
+    </div>
+  )
+
   if (!subject) return null
+  if (loading) return <QRSkeleton />
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">

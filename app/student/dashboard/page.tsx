@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import { QrCode, Clock, BookOpen, User, LogOut, Camera } from "lucide-react"
 import Link from "next/link"
 import { apiClient } from "@/lib/api"
@@ -22,6 +23,7 @@ interface Subject {
 export default function StudentDashboard() {
   const [user, setUser] = useState<any>(null)
   const [subjects, setSubjects] = useState<Subject[]>([])
+  const [loading, setLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
@@ -45,6 +47,7 @@ export default function StudentDashboard() {
         setSubjects(data.subjects || [])
       })
       .catch(() => setSubjects([]))
+      .finally(() => setLoading(false))
   }, [router])
 
   const handleLogout = () => {
@@ -53,6 +56,72 @@ export default function StudentDashboard() {
   }
 
   if (!user) return null
+
+  // Skeleton loading component
+  const DashboardSkeleton = () => (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <header className="bg-white shadow-sm border-b">
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="flex items-center space-x-4">
+            <Skeleton className="w-10 h-10 rounded-full" />
+            <div>
+              <Skeleton className="h-6 w-32 mb-1" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+          </div>
+          <Skeleton className="h-10 w-20" />
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 py-8 flex-1">
+        <div className="grid lg:grid-cols-3 gap-6 mb-8">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-4" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-16" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="space-y-4">
+          <Skeleton className="h-6 w-32" />
+          <div className="grid gap-4">
+            {[1, 2, 3].map((i) => (
+              <Card key={i}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-6 w-16" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </main>
+      
+      <footer className="bg-white border-t mt-auto py-4 flex-shrink-0">
+        <div className="container mx-auto px-4">
+          <div className="text-center text-sm text-gray-600">
+            © 2024 Jerryfel Laraga. All rights reserved.
+          </div>
+        </div>
+      </footer>
+    </div>
+  )
+
+  if (loading) return <DashboardSkeleton />
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
