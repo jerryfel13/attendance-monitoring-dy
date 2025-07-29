@@ -332,16 +332,8 @@ router.put('/sessions/:id/stop', async (req, res) => {
     // Process each pending record to determine late status
     for (const record of pendingRecords.rows) {
       if (record.check_in_time) {
-        // Get subject's scheduled start time
-        const subjectData = await pool.query(
-          'SELECT start_time FROM subjects WHERE id = $1',
-          [session.subject_id]
-        );
-        
-        const subjectStartTime = subjectData.rows[0]?.start_time || '09:00:00';
-        
-        // Create session start timestamp using subject's scheduled start time
-        const sessionStartTime = new Date(`${session.session_date}T${subjectStartTime}`);
+        // Create session start timestamp using the actual session_time
+        const sessionStartTime = new Date(`${session.session_date}T${session.session_time}`);
         
         // Calculate time difference in minutes
         const timeDifference = (record.check_in_time - sessionStartTime) / (1000 * 60);
@@ -349,25 +341,28 @@ router.put('/sessions/:id/stop', async (req, res) => {
         console.log(`Session stop calculation for student ${record.student_id}:`);
         console.log(`  - check_in_time: ${record.check_in_time}`);
         console.log(`  - session_date: ${session.session_date}`);
-        console.log(`  - subject_start_time: ${subjectStartTime}`);
+        console.log(`  - session_time: ${session.session_time}`);
         console.log(`  - calculated_session_start: ${sessionStartTime}`);
         console.log(`  - time_difference: ${timeDifference} minutes`);
         console.log(`  - late_threshold: ${session.late_threshold} minutes`);
         
         let finalStatus = 'present';
+        let isLate = false;
+        
         if (timeDifference > session.late_threshold) {
           finalStatus = 'late';
+          isLate = true;
           console.log(`  - RESULT: Student is LATE (${timeDifference} > ${session.late_threshold})`);
         } else {
           console.log(`  - RESULT: Student is PRESENT (${timeDifference} <= ${session.late_threshold})`);
         }
         
-        // Update record with final status and check_out_time
+        // Update record with final status, check_out_time, and is_late flag
         await pool.query(`
           UPDATE attendance_records 
-          SET status = $1, check_out_time = NOW() 
-          WHERE id = $2
-        `, [finalStatus, record.id]);
+          SET status = $1, check_out_time = NOW(), is_late = $2 
+          WHERE id = $3
+        `, [finalStatus, isLate, record.id]);
         
         console.log(`Updated student ${record.student_id} to status: ${finalStatus}`);
       } else {
@@ -762,17 +757,16 @@ router.post('/scan', async (req, res) => {
       // Calculate late status based on check_in_time and session start time
       const session = sessionResult.rows[0];
       
-      // Get subject late threshold and scheduled start time
+      // Get subject late threshold
       const subjectData = await pool.query(
-        'SELECT late_threshold, start_time FROM subjects WHERE id = $1',
+        'SELECT late_threshold FROM subjects WHERE id = $1',
         [subjectId]
       );
       
       const lateThreshold = subjectData.rows[0]?.late_threshold || 15;
-      const subjectStartTime = subjectData.rows[0]?.start_time || '09:00:00';
       
-      // Create session start timestamp using subject's scheduled start time
-      const sessionStartTime = new Date(`${session.session_date}T${subjectStartTime}`);
+      // Create session start timestamp using the actual session_time
+      const sessionStartTime = new Date(`${session.session_date}T${session.session_time}`);
       
       // Calculate time difference in minutes
       const timeDifference = (record.check_in_time - sessionStartTime) / (1000 * 60);
@@ -780,23 +774,26 @@ router.post('/scan', async (req, res) => {
       console.log(`Scan-out calculation:`);
       console.log(`  - check_in_time: ${record.check_in_time}`);
       console.log(`  - session_date: ${session.session_date}`);
-      console.log(`  - subject_start_time: ${subjectStartTime}`);
+      console.log(`  - session_time: ${session.session_time}`);
       console.log(`  - calculated_session_start: ${sessionStartTime}`);
       console.log(`  - time_difference: ${timeDifference} minutes`);
       console.log(`  - late_threshold: ${lateThreshold} minutes`);
       
       let finalStatus = 'present';
+      let isLate = false;
+      
       if (timeDifference > lateThreshold) {
         finalStatus = 'late';
+        isLate = true;
         console.log(`  - RESULT: Student is LATE (${timeDifference} > ${lateThreshold})`);
       } else {
         console.log(`  - RESULT: Student is PRESENT (${timeDifference} <= ${lateThreshold})`);
       }
       
-      // Update record with final status and check_out_time
+      // Update record with final status, check_out_time, and is_late flag
       await pool.query(
-        'UPDATE attendance_records SET status = $1, check_out_time = NOW() WHERE id = $2',
-        [finalStatus, record.id]
+        'UPDATE attendance_records SET status = $1, check_out_time = NOW(), is_late = $2 WHERE id = $3',
+        [finalStatus, isLate, record.id]
       );
       
       console.log(`Updated student ${studentId} to status: ${finalStatus}`);
@@ -885,10 +882,31 @@ router.post('/scan', async (req, res) => {
         }
       }
       
-      // Mark attendance as pending initially (will be finalized on scan-out)
+      // Calculate late status immediately upon check-in
+      const sessionStartTime = new Date(`${session.session_date}T${session.session_time}`);
+      const checkInTime = new Date();
+      const timeDifference = (checkInTime - sessionStartTime) / (1000 * 60);
+      
+      // Get subject late threshold
+      const subjectData = await pool.query(
+        'SELECT late_threshold FROM subjects WHERE id = $1',
+        [subjectId]
+      );
+      
+      const lateThreshold = subjectData.rows[0]?.late_threshold || 15;
+      let isLate = false;
+      
+      if (timeDifference > lateThreshold) {
+        isLate = true;
+        console.log(`Student ${studentId} is LATE: ${timeDifference} minutes > ${lateThreshold} threshold`);
+      } else {
+        console.log(`Student ${studentId} is ON TIME: ${timeDifference} minutes <= ${lateThreshold} threshold`);
+      }
+      
+      // Mark attendance as pending with late status immediately
       await pool.query(
-        'INSERT INTO attendance_records (session_id, student_id, status, check_in_time) VALUES ($1, $2, $3, NOW())',
-        [sessionId, studentId, 'pending']
+        'INSERT INTO attendance_records (session_id, student_id, status, check_in_time, is_late) VALUES ($1, $2, $3, NOW(), $4)',
+        [sessionId, studentId, 'pending', isLate]
       );
       
       res.json({

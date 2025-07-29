@@ -1113,11 +1113,35 @@ export default async function handler(req, res) {
           }
         }
         
-        // Insert new attendance record
+        // Calculate late status immediately upon check-in
+        const sessionData = await pool.query(
+          'SELECT s.session_date, s.session_time, sub.late_threshold FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
+          [manualCode.session_id]
+        );
+        
+        if (sessionData.rows.length === 0) {
+          return res.status(404).json({ error: 'Session not found' });
+        }
+        
+        const session = sessionData.rows[0];
+        const sessionStartTime = new Date(`${session.session_date}T${session.session_time}`);
+        const checkInTime = new Date();
+        const timeDifference = (checkInTime - sessionStartTime) / (1000 * 60);
+        const lateThreshold = session.late_threshold || 15;
+        
+        let isLate = false;
+        if (timeDifference > lateThreshold) {
+          isLate = true;
+          console.log(`Manual scan-in: Student ${studentId} is LATE: ${timeDifference} minutes > ${lateThreshold} threshold`);
+        } else {
+          console.log(`Manual scan-in: Student ${studentId} is ON TIME: ${timeDifference} minutes <= ${lateThreshold} threshold`);
+        }
+        
+        // Insert new attendance record with late status
         try {
         await pool.query(
-          'INSERT INTO attendance_records (session_id, student_id, status, check_in_time) VALUES ($1, $2, $3, NOW())',
-          [manualCode.session_id, studentId, 'pending']
+          'INSERT INTO attendance_records (session_id, student_id, status, check_in_time, is_late) VALUES ($1, $2, $3, NOW(), $4)',
+          [manualCode.session_id, studentId, 'pending', isLate]
         );
           console.log('Attendance record created successfully for student:', studentId, 'session:', manualCode.session_id);
           return res.json({ 
@@ -1140,22 +1164,30 @@ export default async function handler(req, res) {
         const record = recordResult.rows[0];
         // Get session info for late threshold
         const sessionData = await pool.query(
-          'SELECT s.session_time, s.session_date, sub.late_threshold, sub.start_time FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
+          'SELECT s.session_time, s.session_date, sub.late_threshold FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
           [manualCode.session_id]
         );
         const session = sessionData.rows[0];
         const lateThreshold = session.late_threshold || 15;
-        const scheduledStartTime = new Date(`${session.session_date}T${session.start_time}`);
+        const sessionStartTime = new Date(`${session.session_date}T${session.session_time}`);
         const checkInTime = new Date(record.check_in_time);
-        const timeDifference = (checkInTime.getTime() - scheduledStartTime.getTime()) / (1000 * 60);
+        const timeDifference = (checkInTime - sessionStartTime) / (1000 * 60);
+        
         let attendanceStatus = 'present';
+        let isLate = false;
+        
         if (timeDifference > lateThreshold) {
           attendanceStatus = 'late';
+          isLate = true;
+          console.log(`Manual scan-out: Student ${studentId} is LATE: ${timeDifference} minutes > ${lateThreshold} threshold`);
+        } else {
+          console.log(`Manual scan-out: Student ${studentId} is ON TIME: ${timeDifference} minutes <= ${lateThreshold} threshold`);
         }
-        // Update record with check_out_time and final status
+        
+        // Update record with check_out_time, final status, and is_late flag
         await pool.query(
-          'UPDATE attendance_records SET check_out_time = NOW(), status = $1 WHERE id = $2',
-          [attendanceStatus, record.id]
+          'UPDATE attendance_records SET check_out_time = NOW(), status = $1, is_late = $2 WHERE id = $3',
+          [attendanceStatus, isLate, record.id]
         );
         return res.json({ message: 'Manual scan-out successful. Your attendance is confirmed.' });
       } else {
