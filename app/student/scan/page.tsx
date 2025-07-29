@@ -24,6 +24,7 @@ export default function ScanPage() {
   const router = useRouter()
   const [manualCode, setManualCode] = useState("");
   const [manualSubmitting, setManualSubmitting] = useState(false);
+  const [processedCodes, setProcessedCodes] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   useEffect(() => {
@@ -80,6 +81,9 @@ export default function ScanPage() {
   }
 
   const onScanSuccess = async (decodedText: string) => {
+    // Prevent multiple rapid scans
+    if (isScanning) return
+    
     setQrCode(decodedText)
     await handleScan(decodedText)
   }
@@ -93,7 +97,23 @@ export default function ScanPage() {
     const dataToProcess = qrData || qrCode
     if (!dataToProcess.trim()) return
 
+    // Prevent multiple rapid scans
+    if (isScanning) return
+    
+    // Check if code was already processed
+    if (processedCodes.has(dataToProcess.trim())) {
+      toast({
+        title: "Already Processed",
+        description: "This code has already been processed.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsScanning(true)
+    
+    // Add a longer delay to prevent rapid successive scans and allow processing
+    await new Promise(resolve => setTimeout(resolve, 1000))
 
     try {
       // Use the new apiClient route
@@ -105,18 +125,31 @@ export default function ScanPage() {
       // Clear the QR code after successful scan
       setQrCode("")
       
+      // Add to processed codes to prevent duplicates
+      setProcessedCodes(prev => new Set([...prev, dataToProcess.trim()]))
+      
+      // Always close camera after scan attempt (success or error)
+      if (isCameraActive) {
+        stopCamera()
+      }
+      
       toast({
         title: data.success ? "Success" : "Error",
         description: data.message,
         variant: data.success ? "default" : "destructive"
       });
       
-      if (isCameraActive && data.success) {
-        stopCamera()
-      }
     } catch (error: any) {
       // Clear QR code on error too
       setQrCode("")
+      
+      // Add to processed codes even on error to prevent retry spam
+      setProcessedCodes(prev => new Set([...prev, dataToProcess.trim()]))
+      
+      // Always close camera after scan attempt (success or error)
+      if (isCameraActive) {
+        stopCamera()
+      }
       
       // Handle specific error types with user-friendly messages
       let errorMessage = "Failed to process QR code. Please try again."
@@ -215,21 +248,70 @@ export default function ScanPage() {
 
   const handleManualCode = async () => {
     if (!manualCode.trim() || !user?.id) return;
-    setManualSubmitting(true);
-    try {
-      const data = await apiClient.auth.submitManualCode({ code: manualCode.trim(), studentId: String(user.id) });
-      
-      // Clear the manual code after successful submission
-      setManualCode("");
-      
+    
+    // Prevent multiple rapid submissions
+    if (manualSubmitting) return;
+    
+    // Check if code was already processed
+    if (processedCodes.has(manualCode.trim())) {
       toast({
-        title: data.success ? "Success" : "Error",
-        description: data.message,
-        variant: data.success ? "default" : "destructive"
+        title: "Already Processed",
+        description: "This code has already been processed.",
+        variant: "destructive"
       });
+      return;
+    }
+    
+    setManualSubmitting(true);
+    
+    // Add delay to prevent rapid submissions
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    try {
+      // Check if it's a subject enrollment code
+      if (manualCode.trim().startsWith("SUBJECT_")) {
+        // Use the same scan endpoint for subject enrollment
+        const data = await apiClient.auth.scan({
+          qrCode: manualCode.trim(),
+          studentId: user?.id,
+        });
+        
+        // Clear the manual code after successful submission
+        setManualCode("");
+        
+        // Add to processed codes to prevent duplicates
+        setProcessedCodes(prev => new Set([...prev, manualCode.trim()]))
+        
+        toast({
+          title: data.success ? "Success" : "Error",
+          description: data.message,
+          variant: data.success ? "default" : "destructive"
+        });
+      } else {
+        // Use manual code endpoint for attendance codes
+        const data = await apiClient.auth.submitManualCode({ 
+          code: manualCode.trim(), 
+          studentId: String(user.id) 
+        });
+        
+        // Clear the manual code after successful submission
+        setManualCode("");
+        
+        // Add to processed codes to prevent duplicates
+        setProcessedCodes(prev => new Set([...prev, manualCode.trim()]))
+        
+        toast({
+          title: data.success ? "Success" : "Error",
+          description: data.message,
+          variant: data.success ? "default" : "destructive"
+        });
+      }
     } catch (error: any) {
       // Clear manual code on error too
       setManualCode("");
+      
+      // Add to processed codes even on error to prevent retry spam
+      setProcessedCodes(prev => new Set([...prev, manualCode.trim()]))
       
       // Handle specific error types with user-friendly messages
       let errorMessage = "Failed to process manual code. Please try again."

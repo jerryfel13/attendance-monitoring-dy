@@ -149,17 +149,31 @@ export default async function handler(req, res) {
           });
         }
         const sessionId = sessionResult.rows[0].id;
-        // Check if already scanned in
+        // Check if already scanned in - enhanced duplicate prevention
         const attendanceCheck = await pool.query(
-          'SELECT id FROM attendance_records WHERE session_id = $1 AND student_id = $2',
+          'SELECT id, status, check_in_time FROM attendance_records WHERE session_id = $1 AND student_id = $2',
           [sessionId, studentId]
         );
         if (attendanceCheck.rows.length > 0) {
-          return res.status(409).json({ 
-            type: 'attendance',
-            message: 'Already scanned in for this session. Please scan out at the end of class.',
-            success: false 
-          });
+          const existingRecord = attendanceCheck.rows[0];
+          
+          // If already has a final status, don't allow scan-in
+          if (['present', 'late', 'absent'].includes(existingRecord.status)) {
+            return res.status(409).json({ 
+              type: 'attendance',
+              message: 'Already scanned in for this session. Please scan out at the end of class.',
+              success: false 
+            });
+          }
+          
+          // If pending status, just return success (already scanned in)
+          if (existingRecord.status === 'pending') {
+            return res.json({
+              type: 'attendance',
+              message: 'Already scanned in for this session. Please scan out at the end of class.',
+              success: true
+            });
+          }
         }
         
         // Mark attendance as pending initially (will be finalized on scan-out)
@@ -203,9 +217,9 @@ export default async function handler(req, res) {
           });
         }
         const sessionId = sessionResult.rows[0].id;
-        // Get scan-in record
+        // Get scan-in record - enhanced duplicate prevention
         const recordResult = await pool.query(
-          'SELECT id, check_in_time, status FROM attendance_records WHERE session_id = $1 AND student_id = $2',
+          'SELECT id, check_in_time, status, check_out_time FROM attendance_records WHERE session_id = $1 AND student_id = $2',
           [sessionId, studentId]
         );
         if (recordResult.rows.length === 0) {
@@ -216,6 +230,15 @@ export default async function handler(req, res) {
           });
         }
         const record = recordResult.rows[0];
+        
+        // Check if already scanned out
+        if (record.check_out_time) {
+          return res.status(409).json({
+            type: 'attendance',
+            message: 'Already scanned out for this session.',
+            success: false
+          });
+        }
         
         // If the record already has a final status (present/late), don't recalculate
         if (record.status === 'present' || record.status === 'late') {
@@ -401,56 +424,190 @@ export default async function handler(req, res) {
     }
   }
 
-  // Manual attendance update (teacher)
+  // Manual attendance update (teacher) - Enhanced with pending status and time tracking
   if (route === 'manual-attendance-update' && req.method === 'POST') {
     const { sessionId, studentId, status } = req.body;
-    if (!sessionId || !studentId || !['present', 'late', 'absent'].includes(status)) {
+    if (!sessionId || !studentId || !['present', 'late', 'absent', 'pending'].includes(status)) {
       return res.status(400).json({ error: 'Missing or invalid sessionId, studentId, or status' });
     }
     try {
       // Check if record exists
       const result = await pool.query(
-        'SELECT id FROM attendance_records WHERE session_id = $1 AND student_id = $2',
+        'SELECT id, status, check_in_time, check_out_time FROM attendance_records WHERE session_id = $1 AND student_id = $2',
         [sessionId, studentId]
       );
+      
       if (result.rows.length > 0) {
-        // Update existing record
-        await pool.query(
-          'UPDATE attendance_records SET status = $1 WHERE session_id = $2 AND student_id = $3',
-          [status, sessionId, studentId]
-        );
+        const existingRecord = result.rows[0];
+        
+        if (status === 'pending') {
+          // Set pending status with check-in time if not already set
+          if (!existingRecord.check_in_time) {
+            await pool.query(
+              'UPDATE attendance_records SET status = $1, check_in_time = NOW() WHERE session_id = $2 AND student_id = $3',
+              [status, sessionId, studentId]
+            );
+          } else {
+            await pool.query(
+              'UPDATE attendance_records SET status = $1 WHERE session_id = $2 AND student_id = $3',
+              [status, sessionId, studentId]
+            );
+          }
+        } else if (status === 'present' || status === 'late') {
+          // Calculate late status based on check-in time and late threshold
+          let finalStatus = status;
+          
+          if (existingRecord.check_in_time) {
+            // Get session info for late threshold calculation
+            const sessionData = await pool.query(
+              'SELECT s.session_date, sub.late_threshold, sub.start_time FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
+              [sessionId]
+            );
+            
+            if (sessionData.rows.length > 0) {
+              const session = sessionData.rows[0];
+              const lateThreshold = session.late_threshold || 15;
+              const scheduledStartTime = new Date(`${session.session_date}T${session.start_time}`);
+              const checkInTime = new Date(existingRecord.check_in_time);
+              const timeDifference = (checkInTime.getTime() - scheduledStartTime.getTime()) / (1000 * 60);
+              
+              // Override status if check-in time indicates late
+              if (timeDifference > lateThreshold) {
+                finalStatus = 'late';
+              } else {
+                finalStatus = 'present';
+              }
+            }
+          }
+          
+          // Set final status with check-out time
+          await pool.query(
+            'UPDATE attendance_records SET status = $1, check_out_time = NOW() WHERE session_id = $2 AND student_id = $3',
+            [finalStatus, sessionId, studentId]
+          );
+        } else if (status === 'absent') {
+          // Set absent status (no check-out time)
+          await pool.query(
+            'UPDATE attendance_records SET status = $1 WHERE session_id = $2 AND student_id = $3',
+            [status, sessionId, studentId]
+          );
+        }
       } else {
         // Insert new record
-        await pool.query(
-          'INSERT INTO attendance_records (session_id, student_id, status, check_in_time) VALUES ($1, $2, $3, NOW())',
-          [sessionId, studentId, status]
-        );
+        if (status === 'pending') {
+          await pool.query(
+            'INSERT INTO attendance_records (session_id, student_id, status, check_in_time) VALUES ($1, $2, $3, NOW())',
+            [sessionId, studentId, status]
+          );
+        } else if (status === 'present' || status === 'late') {
+          await pool.query(
+            'INSERT INTO attendance_records (session_id, student_id, status, check_in_time, check_out_time) VALUES ($1, $2, $3, NOW(), NOW())',
+            [sessionId, studentId, status]
+          );
+        } else if (status === 'absent') {
+          await pool.query(
+            'INSERT INTO attendance_records (session_id, student_id, status) VALUES ($1, $2, $3)',
+            [sessionId, studentId, status]
+          );
+        }
       }
+      
       return res.json({ message: 'Attendance updated successfully.' });
     } catch (err) {
       return res.status(500).json({ error: 'Failed to update attendance', details: err.message });
     }
   }
 
-  // STOP SESSION: Mark absent if not scanned out
+  // STOP SESSION: Enhanced with late status calculation based on check-in time and late threshold
   if (route === 'stop-session' && req.method === 'PUT') {
     const { sessionId } = req.query;
     if (!sessionId) {
       return res.status(400).json({ error: 'Missing sessionId' });
     }
     try {
-      // Set all pending records to absent
-      await pool.query(
-        `UPDATE attendance_records SET status = 'absent' WHERE session_id = $1 AND status = 'pending'`,
-        [sessionId]
-      );
+      // Get session and subject information for late threshold calculation
+      const sessionInfo = await pool.query(`
+        SELECT 
+          s.session_date, 
+          s.session_time, 
+          s.start_time,
+          sub.late_threshold,
+          sub.name as subject_name
+        FROM attendance_sessions s
+        JOIN subjects sub ON s.subject_id = sub.id
+        WHERE s.id = $1
+      `, [sessionId]);
+      
+      if (sessionInfo.rows.length === 0) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+      
+      const session = sessionInfo.rows[0];
+      const lateThreshold = session.late_threshold || 15; // Default 15 minutes
+      const scheduledStartTime = new Date(`${session.session_date}T${session.start_time}`);
+      
+      // Get all pending records for this session
+      const pendingRecords = await pool.query(`
+        SELECT 
+          ar.id, 
+          ar.student_id, 
+          ar.check_in_time,
+          u.name as student_name
+        FROM attendance_records ar
+        JOIN users u ON ar.student_id = u.id
+        WHERE ar.session_id = $1 AND ar.status = 'pending'
+      `, [sessionId]);
+      
+      let lateCount = 0;
+      let presentCount = 0;
+      
+      // Process each pending record
+      for (const record of pendingRecords.rows) {
+        if (record.check_in_time) {
+          const checkInTime = new Date(record.check_in_time);
+          const timeDifference = (checkInTime.getTime() - scheduledStartTime.getTime()) / (1000 * 60); // in minutes
+          
+          let finalStatus = 'present';
+          if (timeDifference > lateThreshold) {
+            finalStatus = 'late';
+            lateCount++;
+          } else {
+            presentCount++;
+          }
+          
+          // Update the record with final status and check-out time
+          await pool.query(
+            'UPDATE attendance_records SET status = $1, check_out_time = NOW() WHERE id = $2',
+            [finalStatus, record.id]
+          );
+          
+          console.log(`Student ${record.student_name} (ID: ${record.student_id}) marked as ${finalStatus}. Check-in: ${checkInTime.toLocaleTimeString()}, Scheduled: ${scheduledStartTime.toLocaleTimeString()}, Difference: ${timeDifference.toFixed(1)} minutes`);
+        } else {
+          // No check-in time, mark as absent
+          await pool.query(
+            'UPDATE attendance_records SET status = $1 WHERE id = $2',
+            ['absent', record.id]
+          );
+        }
+      }
+      
       // Deactivate the session
       await pool.query(
         'UPDATE attendance_sessions SET is_active = false WHERE id = $1',
         [sessionId]
       );
-      return res.json({ message: 'Session stopped. Absentees marked for students who did not scan out.' });
+      
+      const message = `Session stopped for ${session.subject_name}. ${presentCount} students marked present, ${lateCount} students marked late.`;
+      return res.json({ 
+        message: message,
+        summary: {
+          present: presentCount,
+          late: lateCount,
+          total: pendingRecords.rows.length
+        }
+      });
     } catch (err) {
+      console.error('Error stopping session:', err);
       return res.status(500).json({ error: 'Failed to stop session', details: err.message });
     }
   }

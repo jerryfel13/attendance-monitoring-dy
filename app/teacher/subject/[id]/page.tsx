@@ -141,7 +141,7 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
     }
   };
 
-  const handleManualAttendanceUpdate = async (studentId: number, status: 'present' | 'late' | 'absent') => {
+  const handleManualAttendanceUpdate = async (studentId: number, status: 'present' | 'late' | 'absent' | 'pending') => {
     if (!selectedSessionId) return;
     setAttendanceUpdateLoading((prev) => ({ ...prev, [studentId]: true }));
     setAttendanceUpdateResult((prev) => ({ ...prev, [studentId]: "" }));
@@ -151,7 +151,20 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
         studentId: String(studentId),
         status,
       });
-      toast({ title: "Attendance updated!", description: `Status set to '${status.charAt(0).toUpperCase() + status.slice(1)}'.` });
+      
+      let statusMessage = '';
+      if (status === 'pending') {
+        statusMessage = 'Student marked as pending (checked in). Set to present/late when they leave.';
+      } else if (status === 'present' || status === 'late') {
+        statusMessage = `Student marked as ${status} (checked out). Status automatically calculated based on check-in time and late threshold.`;
+      } else {
+        statusMessage = `Student marked as ${status}.`;
+      }
+      
+      toast({ 
+        title: "Attendance updated!", 
+        description: statusMessage
+      });
       setAttendanceUpdateResult((prev) => ({ ...prev, [studentId]: "" }));
       refetchAll();
     } catch (err: any) {
@@ -179,9 +192,12 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
       Name: s.name,
       "Student ID": s.student_id,
       Email: s.email,
-      Status: s.status || "-",
+      Status: s.status || "Not Scanned",
       "Check In": s.check_in_time ? new Date(s.check_in_time).toLocaleTimeString() : "-",
       "Check Out": s.check_out_time ? new Date(s.check_out_time).toLocaleTimeString() : "-",
+      "Notes": s.status === 'pending' ? 'Student checked in, waiting for check out' : 
+               s.status === 'present' || s.status === 'late' ? 'Student completed attendance' :
+               s.status === 'absent' ? 'Student marked absent' : 'No attendance record'
     })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Attendance");
@@ -191,14 +207,17 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
     const doc = new jsPDF();
     doc.text("Attendance Report", 14, 16);
     (doc as any).autoTable({
-      head: [["Name", "Student ID", "Email", "Status", "Check In", "Check Out"]],
+      head: [["Name", "Student ID", "Email", "Status", "Check In", "Check Out", "Notes"]],
       body: sessionAttendance.map((s: any) => [
         s.name,
         s.student_id,
         s.email,
-        s.status || "-",
+        s.status || "Not Scanned",
         s.check_in_time ? new Date(s.check_in_time).toLocaleTimeString() : "-",
         s.check_out_time ? new Date(s.check_out_time).toLocaleTimeString() : "-",
+        s.status === 'pending' ? 'Student checked in, waiting for check out' : 
+        s.status === 'present' || s.status === 'late' ? 'Student completed attendance' :
+        s.status === 'absent' ? 'Student marked absent' : 'No attendance record'
       ]),
       startY: 22,
     });
@@ -447,13 +466,14 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
                           <div className="flex flex-col gap-1">
                             <ShadSelect
                               value=""
-                              onValueChange={value => handleManualAttendanceUpdate(student.id, value as 'present' | 'late' | 'absent')}
+                              onValueChange={value => handleManualAttendanceUpdate(student.id, value as 'present' | 'late' | 'absent' | 'pending')}
                               disabled={!selectedSessionId || attendanceUpdateLoading[student.id]}
                             >
                               <SelectTrigger className="w-full">Update Status</SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="present">Present</SelectItem>
-                                <SelectItem value="late">Late</SelectItem>
+                                <SelectItem value="pending">Pending (Check In)</SelectItem>
+                                <SelectItem value="present">Present (Auto-calculated)</SelectItem>
+                                <SelectItem value="late">Late (Auto-calculated)</SelectItem>
                                 <SelectItem value="absent">Absent</SelectItem>
                               </SelectContent>
                             </ShadSelect>
@@ -526,7 +546,19 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
                           <TableCell>{student.name}</TableCell>
                           <TableCell>{student.student_id}</TableCell>
                           <TableCell>{student.email}</TableCell>
-                          <TableCell>{student.status || "-"}</TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={
+                                student.status === 'present' ? 'default' :
+                                student.status === 'late' ? 'secondary' :
+                                student.status === 'pending' ? 'outline' :
+                                student.status === 'absent' ? 'destructive' :
+                                'secondary'
+                              }
+                            >
+                              {student.status || "Not Scanned"}
+                            </Badge>
+                          </TableCell>
                           <TableCell>{student.check_in_time ? new Date(student.check_in_time).toLocaleTimeString() : "-"}</TableCell>
                           <TableCell>{student.check_out_time ? new Date(student.check_out_time).toLocaleTimeString() : "-"}</TableCell>
                         </TableRow>

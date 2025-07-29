@@ -52,7 +52,7 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-    manualAttendanceUpdate: (data: { sessionId: string, studentId: string, status: 'present' | 'late' | 'absent' }) => apiClient.request('/auth?route=manual-attendance-update', {
+    manualAttendanceUpdate: (data: { sessionId: string, studentId: string, status: 'present' | 'late' | 'absent' | 'pending' }) => apiClient.request('/auth?route=manual-attendance-update', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
