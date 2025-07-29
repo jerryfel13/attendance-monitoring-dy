@@ -78,6 +78,12 @@ export default function ScanPage() {
       scannerRef.current = null
     }
     setIsCameraActive(false)
+    
+    // Force refresh the QR reader div to completely stop scanning
+    const qrReader = document.getElementById('qr-reader')
+    if (qrReader) {
+      qrReader.innerHTML = ''
+    }
   }
 
   const onScanSuccess = async (decodedText: string) => {
@@ -139,10 +145,18 @@ export default function ScanPage() {
         variant: data.success ? "default" : "destructive"
       });
       
-      // Clear processed codes after a delay to allow for new scans
-      setTimeout(() => {
-        setProcessedCodes(new Set())
-      }, 3000)
+      // Force refresh the card after successful scan
+      if (data.success) {
+        // Small delay to ensure toast is shown before refresh
+        setTimeout(() => {
+          window.location.reload()
+        }, 1500)
+      } else {
+        // Clear processed codes after a delay to allow for new scans
+        setTimeout(() => {
+          setProcessedCodes(new Set())
+        }, 3000)
+      }
       
     } catch (error: any) {
       // Clear QR code on error too
@@ -298,10 +312,18 @@ export default function ScanPage() {
           variant: data.success ? "default" : "destructive"
         });
         
-        // Clear processed codes after a delay to allow for new scans
-        setTimeout(() => {
-          setProcessedCodes(new Set())
-        }, 3000)
+        // Force refresh the card after successful scan
+        if (data.success) {
+          // Small delay to ensure toast is shown before refresh
+          setTimeout(() => {
+            window.location.reload()
+          }, 1500)
+        } else {
+          // Clear processed codes after a delay to allow for new scans
+          setTimeout(() => {
+            setProcessedCodes(new Set())
+          }, 3000)
+        }
       } else {
         // Use manual code endpoint for attendance codes
         const data = await apiClient.auth.submitManualCode({ 
@@ -321,10 +343,18 @@ export default function ScanPage() {
           variant: data.success ? "default" : "destructive"
         });
         
-        // Clear processed codes after a delay to allow for new scans
-        setTimeout(() => {
-          setProcessedCodes(new Set())
-        }, 3000)
+        // Force refresh the card after successful scan
+        if (data.success) {
+          // Small delay to ensure toast is shown before refresh
+          setTimeout(() => {
+            window.location.reload()
+          }, 1500)
+        } else {
+          // Clear processed codes after a delay to allow for new scans
+          setTimeout(() => {
+            setProcessedCodes(new Set())
+          }, 3000)
+        }
       }
     } catch (error: any) {
       // Clear manual code on error too
