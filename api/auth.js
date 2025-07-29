@@ -443,12 +443,12 @@ export default async function handler(req, res) {
           
           // If already has a final status, don't allow scan-in
           if (['present', 'late', 'absent'].includes(existingRecord.status)) {
-            return res.status(409).json({ 
-              type: 'attendance',
-              message: 'Already scanned in for this session. Please scan out at the end of class.',
-              success: false 
-            });
-          }
+          return res.status(409).json({ 
+            type: 'attendance',
+            message: 'Already scanned in for this session. Please scan out at the end of class.',
+            success: false 
+          });
+        }
           
           // If pending status, just return success (already scanned in)
           if (existingRecord.status === 'pending') {
@@ -812,9 +812,9 @@ export default async function handler(req, res) {
           // Handle scan-in with trimmed code
           const attendanceInfo = trimmedQrCode.replace("ATTENDANCE:", "").trim();
           const match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)\s*-\s*(.+)$/);
-          if (!match) {
-            return res.status(400).json({ error: 'Invalid attendance QR code format' });
-          }
+        if (!match) {
+          return res.status(400).json({ error: 'Invalid attendance QR code format' });
+        }
           const [, subjectName, subjectCode, date] = match;
           
           console.log('Scan-in QR Code (trimmed):', trimmedQrCode);
@@ -897,15 +897,15 @@ export default async function handler(req, res) {
           const subjectInfo = qrCode.replace(/^.*?subject[:\s]*/i, "").trim();
           const match = subjectInfo.match(/^(.+?)\s*\(([^)]+)\)/);
           if (match) {
-            const [, subjectName, subjectCode] = match;
+        const [, subjectName, subjectCode] = match;
             console.log('Parsed subject name:', subjectName.trim());
             console.log('Parsed subject code:', subjectCode.trim());
             
-            const subjectResult = await pool.query(
-              'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
-              [subjectName.trim(), subjectCode.trim()]
-            );
-            if (subjectResult.rows.length === 0) {
+        const subjectResult = await pool.query(
+          'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
+          [subjectName.trim(), subjectCode.trim()]
+        );
+        if (subjectResult.rows.length === 0) {
               console.log('Subject not found for:', subjectName.trim(), subjectCode.trim());
               return res.status(404).json({ error: 'Subject not found' });
             }
@@ -948,33 +948,33 @@ export default async function handler(req, res) {
             );
             if (subjectResult.rows.length === 0) {
               console.log('Subject not found for:', subjectName.trim(), subjectCode.trim());
-              return res.status(404).json({ error: 'Subject not found' });
-            }
-            const subjectId = subjectResult.rows[0].id;
-            const sessionResult = await pool.query(
-              'SELECT id FROM attendance_sessions WHERE subject_id = $1 AND is_active = true ORDER BY session_date DESC, session_time DESC LIMIT 1',
-              [subjectId]
-            );
-            if (sessionResult.rows.length === 0) {
-              return res.status(404).json({ 
-                type: 'attendance',
-                message: 'No active attendance session found for this subject',
-                success: false 
-              });
-            }
-            const sessionId = sessionResult.rows[0].id;
-            const recordResult = await pool.query(
+          return res.status(404).json({ error: 'Subject not found' });
+        }
+        const subjectId = subjectResult.rows[0].id;
+        const sessionResult = await pool.query(
+          'SELECT id FROM attendance_sessions WHERE subject_id = $1 AND is_active = true ORDER BY session_date DESC, session_time DESC LIMIT 1',
+          [subjectId]
+        );
+        if (sessionResult.rows.length === 0) {
+          return res.status(404).json({ 
+            type: 'attendance',
+            message: 'No active attendance session found for this subject',
+            success: false 
+          });
+        }
+        const sessionId = sessionResult.rows[0].id;
+        const recordResult = await pool.query(
               'SELECT id, check_in_time, status, check_out_time FROM attendance_records WHERE session_id = $1 AND student_id = $2',
-              [sessionId, studentId]
-            );
-            if (recordResult.rows.length === 0) {
-              return res.status(404).json({ 
-                type: 'attendance',
-                message: 'No scan-in record found. Please scan in first.',
-                success: false 
-              });
-            }
-            const record = recordResult.rows[0];
+          [sessionId, studentId]
+        );
+        if (recordResult.rows.length === 0) {
+          return res.status(404).json({ 
+            type: 'attendance',
+            message: 'No scan-in record found. Please scan in first.',
+            success: false 
+          });
+        }
+        const record = recordResult.rows[0];
             if (record.check_out_time) {
               return res.status(409).json({
                 type: 'attendance',
@@ -994,29 +994,29 @@ export default async function handler(req, res) {
               });
             }
             if (record.status === 'pending') {
-              const sessionData = await pool.query(
+        const sessionData = await pool.query(
                 'SELECT s.session_time, s.session_date, sub.late_threshold, sub.start_time FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
-                [sessionId]
-              );
-              const session = sessionData.rows[0];
-              const lateThreshold = session.late_threshold || 15;
+          [sessionId]
+        );
+        const session = sessionData.rows[0];
+        const lateThreshold = session.late_threshold || 15;
               const scheduledStartTime = new Date(`${session.session_date}T${session.start_time}`);
-              const checkInTime = new Date(record.check_in_time);
+        const checkInTime = new Date(record.check_in_time);
               const timeDifference = (checkInTime.getTime() - scheduledStartTime.getTime()) / (1000 * 60);
-              let attendanceStatus = 'present';
-              if (timeDifference > lateThreshold) {
-                attendanceStatus = 'late';
-              }
-              await pool.query(
-                'UPDATE attendance_records SET check_out_time = NOW(), status = $1 WHERE id = $2',
-                [attendanceStatus, record.id]
-              );
+        let attendanceStatus = 'present';
+        if (timeDifference > lateThreshold) {
+          attendanceStatus = 'late';
+        }
+        await pool.query(
+          'UPDATE attendance_records SET check_out_time = NOW(), status = $1 WHERE id = $2',
+          [attendanceStatus, record.id]
+        );
             }
-            return res.json({
-              type: 'attendance',
-              message: 'Scan-out successful. Your attendance is confirmed.',
-              success: true
-            });
+        return res.json({
+          type: 'attendance',
+          message: 'Scan-out successful. Your attendance is confirmed.',
+          success: true
+        });
           }
         }
         
@@ -1105,8 +1105,8 @@ export default async function handler(req, res) {
           const existingRecord = attendanceCheck.rows[0];
           // If already has a final status (present/late/absent), don't allow scan-in
           if (['present', 'late', 'absent'].includes(existingRecord.status)) {
-            return res.status(409).json({ error: 'Already scanned in for this session' });
-          }
+          return res.status(409).json({ error: 'Already scanned in for this session' });
+        }
           // If pending, update to mark as scanned in again
           if (existingRecord.status === 'pending') {
             return res.json({ message: 'Already scanned in for this session. Please scan out when class ends.' });
@@ -1115,10 +1115,10 @@ export default async function handler(req, res) {
         
         // Insert new attendance record
         try {
-          await pool.query(
-            'INSERT INTO attendance_records (session_id, student_id, status, check_in_time) VALUES ($1, $2, $3, NOW())',
-            [manualCode.session_id, studentId, 'pending']
-          );
+        await pool.query(
+          'INSERT INTO attendance_records (session_id, student_id, status, check_in_time) VALUES ($1, $2, $3, NOW())',
+          [manualCode.session_id, studentId, 'pending']
+        );
           console.log('Attendance record created successfully for student:', studentId, 'session:', manualCode.session_id);
           return res.json({ 
             message: 'Manual scan-in successful. Please scan out or ask for a manual code at the end of class.',
@@ -1190,10 +1190,10 @@ export default async function handler(req, res) {
               [status, sessionId, studentId]
             );
           } else {
-            await pool.query(
-              'UPDATE attendance_records SET status = $1 WHERE session_id = $2 AND student_id = $3',
-              [status, sessionId, studentId]
-            );
+        await pool.query(
+          'UPDATE attendance_records SET status = $1 WHERE session_id = $2 AND student_id = $3',
+          [status, sessionId, studentId]
+        );
           }
         } else if (status === 'present' || status === 'late') {
           // Calculate late status based on check-in time and late threshold
@@ -1237,10 +1237,10 @@ export default async function handler(req, res) {
       } else {
         // Insert new record
         if (status === 'pending') {
-          await pool.query(
-            'INSERT INTO attendance_records (session_id, student_id, status, check_in_time) VALUES ($1, $2, $3, NOW())',
-            [sessionId, studentId, status]
-          );
+        await pool.query(
+          'INSERT INTO attendance_records (session_id, student_id, status, check_in_time) VALUES ($1, $2, $3, NOW())',
+          [sessionId, studentId, status]
+        );
         } else if (status === 'present' || status === 'late') {
           await pool.query(
             'INSERT INTO attendance_records (session_id, student_id, status, check_in_time, check_out_time) VALUES ($1, $2, $3, NOW(), NOW())',
@@ -1249,9 +1249,9 @@ export default async function handler(req, res) {
         } else if (status === 'absent') {
           await pool.query(
             'INSERT INTO attendance_records (session_id, student_id, status) VALUES ($1, $2, $3)',
-            [sessionId, studentId, status]
-          );
-        }
+          [sessionId, studentId, status]
+        );
+      }
       }
       
       return res.json({ message: 'Attendance updated successfully.' });
@@ -1318,7 +1318,7 @@ export default async function handler(req, res) {
           }
           
           // Update the record with final status and check-out time
-          await pool.query(
+      await pool.query(
             'UPDATE attendance_records SET status = $1, check_out_time = NOW() WHERE id = $2',
             [finalStatus, record.id]
           );

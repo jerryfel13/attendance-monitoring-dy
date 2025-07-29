@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS users (
     student_id VARCHAR(50),
     department VARCHAR(100),
     password_hash VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Subjects table
@@ -26,8 +26,8 @@ CREATE TABLE IF NOT EXISTS subjects (
     end_time TIME NOT NULL,
     late_threshold INTEGER DEFAULT 15, -- minutes
     enrollment_qr VARCHAR(500),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Subject enrollments (many-to-many relationship)
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS enrollments (
     id SERIAL PRIMARY KEY,
     student_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     subject_id INTEGER REFERENCES subjects(id) ON DELETE CASCADE,
-    enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    enrolled_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(student_id, subject_id)
 );
 
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS attendance_sessions (
     session_time TIME NOT NULL,
     attendance_qr VARCHAR(500),
     is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(subject_id, session_date, session_time)
 );
 
@@ -56,9 +56,9 @@ CREATE TABLE IF NOT EXISTS attendance_records (
     id SERIAL PRIMARY KEY,
     session_id INTEGER REFERENCES attendance_sessions(id) ON DELETE CASCADE,
     student_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    check_in_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    check_out_time TIMESTAMP,
-    status VARCHAR(20) DEFAULT 'present' CHECK (status IN ('present', 'late', 'absent')),
+    check_in_time TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    check_out_time TIMESTAMPTZ,
+    status VARCHAR(20) DEFAULT 'present' CHECK (status IN ('present', 'late', 'absent', 'pending')),
     is_late BOOLEAN DEFAULT false,
     UNIQUE(session_id, student_id)
 );
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS manual_attendance_codes (
     type VARCHAR(10) NOT NULL CHECK (type IN ('in', 'out')),
     code VARCHAR(20) NOT NULL,
     used BOOLEAN DEFAULT false,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Indexes for better performance

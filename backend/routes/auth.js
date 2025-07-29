@@ -300,11 +300,13 @@ router.get('/subjects/:id/sessions/active', async (req, res) => {
 router.put('/sessions/:id/stop', async (req, res) => {
   const { id } = req.params;
   try {
-    // Get session details
-    const sessionResult = await pool.query(
-      'SELECT s.id, s.subject_id, s.session_date, s.session_time FROM attendance_sessions s WHERE s.id = $1',
-      [id]
-    );
+    // Get session details with subject late_threshold
+    const sessionResult = await pool.query(`
+      SELECT s.id, s.subject_id, s.session_date, s.session_time, sub.late_threshold 
+      FROM attendance_sessions s 
+      JOIN subjects sub ON s.subject_id = sub.id 
+      WHERE s.id = $1
+    `, [id]);
     
     if (sessionResult.rows.length === 0) {
       return res.status(404).json({ error: 'Session not found' });
@@ -318,11 +320,50 @@ router.put('/sessions/:id/stop', async (req, res) => {
       [session.subject_id]
     );
     
-    // First, update all pending records to absent
-    await pool.query(
-      'UPDATE attendance_records SET status = $1 WHERE session_id = $2 AND status = $3',
-      ['absent', id, 'pending']
-    );
+    // Get all pending records for this session
+    const pendingRecords = await pool.query(`
+      SELECT ar.id, ar.student_id, ar.check_in_time, ar.status
+      FROM attendance_records ar 
+      WHERE ar.session_id = $1 AND ar.status = 'pending'
+    `, [id]);
+    
+    console.log(`Processing ${pendingRecords.rows.length} pending records for session ${id}`);
+    
+    // Process each pending record to determine late status
+    for (const record of pendingRecords.rows) {
+      if (record.check_in_time) {
+        // Create session start timestamp
+        const sessionStartTime = new Date(`${session.session_date}T${session.session_time}`);
+        
+        // Calculate time difference in minutes
+        const timeDifference = (record.check_in_time - sessionStartTime) / (1000 * 60);
+        
+        console.log(`Student ${record.student_id}: check_in_time=${record.check_in_time}, session_start=${sessionStartTime}, diff=${timeDifference}min, threshold=${session.late_threshold}min`);
+        
+        let finalStatus = 'present';
+        if (timeDifference > session.late_threshold) {
+          finalStatus = 'late';
+        }
+        
+        // Update record with final status and check_out_time
+        await pool.query(`
+          UPDATE attendance_records 
+          SET status = $1, check_out_time = NOW() 
+          WHERE id = $2
+        `, [finalStatus, record.id]);
+        
+        console.log(`Updated student ${record.student_id} to status: ${finalStatus}`);
+      } else {
+        // No check_in_time, mark as absent
+        await pool.query(`
+          UPDATE attendance_records 
+          SET status = 'absent' 
+          WHERE id = $2
+        `, [record.id]);
+        
+        console.log(`Updated student ${record.student_id} to status: absent (no check_in_time)`);
+      }
+    }
     
     // Get students who already marked attendance with final status
     const markedStudents = await pool.query(
@@ -357,9 +398,11 @@ router.put('/sessions/:id/stop', async (req, res) => {
       session: result.rows[0],
       absentCount: absentStudents.length,
       totalEnrolled: enrolledStudents.rows.length,
-      markedCount: markedStudents.rows.length
+      markedCount: markedStudents.rows.length,
+      processedPending: pendingRecords.rows.length
     });
   } catch (err) {
+    console.error('Error stopping session:', err);
     res.status(500).json({ error: 'Failed to stop session', details: err.message });
   }
 });
@@ -616,8 +659,128 @@ router.post('/scan', async (req, res) => {
         success: true
       });
       
+    } else if (qrCode.startsWith("ATTENDANCE_OUT_")) {
+      // Handle attendance check-out with late calculation
+      console.log('Processing scan-out QR code:', qrCode);
+      
+      // Parse ATTENDANCE_OUT_ format: ATTENDANCE_OUT_SubjectName_SubjectCode_Date
+      const parts = qrCode.split('_');
+      if (parts.length < 4) {
+        return res.status(400).json({ error: 'Invalid attendance out QR code format' });
+      }
+      
+      // Extract subject name and code (parts[2] and parts[3])
+      const subjectName = parts[2];
+      const subjectCode = parts[3];
+      
+      console.log('Extracted subject name:', subjectName);
+      console.log('Extracted subject code:', subjectCode);
+      
+      // Find the subject
+      const subjectResult = await pool.query(
+        'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
+        [subjectName.trim(), subjectCode.trim()]
+      );
+      
+      if (subjectResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Subject not found' });
+      }
+      
+      const subjectId = subjectResult.rows[0].id;
+      
+      // Check if student is enrolled
+      const enrollmentCheck = await pool.query(
+        'SELECT id FROM enrollments WHERE student_id = $1 AND subject_id = $2',
+        [studentId, subjectId]
+      );
+      
+      if (enrollmentCheck.rows.length === 0) {
+        return res.status(403).json({ 
+          type: 'attendance',
+          message: 'You are not enrolled in this subject',
+          success: false 
+        });
+      }
+      
+      // Find active attendance session for this subject
+      const sessionResult = await pool.query(
+        'SELECT id, session_date, session_time FROM attendance_sessions WHERE subject_id = $1 AND is_active = true ORDER BY session_date DESC, session_time DESC LIMIT 1',
+        [subjectId]
+      );
+      
+      if (sessionResult.rows.length === 0) {
+        return res.status(404).json({ 
+          type: 'attendance',
+          message: 'No active attendance session found for this subject',
+          success: false 
+        });
+      }
+      
+      const sessionId = sessionResult.rows[0].id;
+      
+      // Check if student has a pending record for this session
+      const attendanceRecord = await pool.query(
+        'SELECT id, status, check_in_time FROM attendance_records WHERE session_id = $1 AND student_id = $2',
+        [sessionId, studentId]
+      );
+      
+      if (attendanceRecord.rows.length === 0) {
+        return res.status(404).json({ 
+          type: 'attendance',
+          message: 'No attendance record found. Please scan in first.',
+          success: false 
+        });
+      }
+      
+      const record = attendanceRecord.rows[0];
+      
+      if (record.status !== 'pending') {
+        return res.status(409).json({ 
+          type: 'attendance',
+          message: 'Attendance already finalized for this session',
+          success: false 
+        });
+      }
+      
+      // Calculate late status based on check_in_time and session start time
+      const session = sessionResult.rows[0];
+      const sessionStartTime = new Date(`${session.session_date}T${session.session_time}`);
+      
+      // Get subject late threshold
+      const subjectData = await pool.query(
+        'SELECT late_threshold FROM subjects WHERE id = $1',
+        [subjectId]
+      );
+      
+      const lateThreshold = subjectData.rows[0]?.late_threshold || 15;
+      
+      // Calculate time difference in minutes
+      const timeDifference = (record.check_in_time - sessionStartTime) / (1000 * 60);
+      
+      console.log(`Scan-out calculation: check_in_time=${record.check_in_time}, session_start=${sessionStartTime}, diff=${timeDifference}min, threshold=${lateThreshold}min`);
+      
+      let finalStatus = 'present';
+      if (timeDifference > lateThreshold) {
+        finalStatus = 'late';
+      }
+      
+      // Update record with final status and check_out_time
+      await pool.query(
+        'UPDATE attendance_records SET status = $1, check_out_time = NOW() WHERE id = $2',
+        [finalStatus, record.id]
+      );
+      
+      console.log(`Updated student ${studentId} to status: ${finalStatus}`);
+      
+      res.json({
+        type: 'attendance',
+        message: `Attendance confirmed for ${subjectName} (${subjectCode}). Status: ${finalStatus}.`,
+        success: true,
+        status: finalStatus
+      });
+      
     } else if (qrCode.startsWith("ATTENDANCE:")) {
-      // Handle attendance marking
+      // Handle attendance check-in
       const attendanceInfo = qrCode.replace("ATTENDANCE:", "").trim();
       
       // Extract subject name and code from QR data (more flexible parsing)
@@ -672,21 +835,30 @@ router.post('/scan', async (req, res) => {
       
       // Check if already marked attendance
       const attendanceCheck = await pool.query(
-        'SELECT id FROM attendance_records WHERE session_id = $1 AND student_id = $2',
+        'SELECT id, status FROM attendance_records WHERE session_id = $1 AND student_id = $2',
         [sessionId, studentId]
       );
       
       if (attendanceCheck.rows.length > 0) {
-        return res.status(409).json({ 
-          type: 'attendance',
-          message: 'Attendance already marked for this session',
-          success: false 
-        });
+        const existingRecord = attendanceCheck.rows[0];
+        if (existingRecord.status === 'pending') {
+          return res.status(409).json({ 
+            type: 'attendance',
+            message: 'Already scanned in. Please scan out at the end of class.',
+            success: false 
+          });
+        } else {
+          return res.status(409).json({ 
+            type: 'attendance',
+            message: 'Attendance already finalized for this session',
+            success: false 
+          });
+        }
       }
       
       // Mark attendance as pending initially (will be finalized on scan-out)
       await pool.query(
-        'INSERT INTO attendance_records (session_id, student_id, status) VALUES ($1, $2, $3)',
+        'INSERT INTO attendance_records (session_id, student_id, status, check_in_time) VALUES ($1, $2, $3, NOW())',
         [sessionId, studentId, 'pending']
       );
       

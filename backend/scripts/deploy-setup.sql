@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(50) NOT NULL CHECK (role IN ('student', 'teacher')),
     student_id VARCHAR(50),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create subjects table
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS subjects (
     end_time TIME,
     schedule_days TEXT[],
     late_threshold INTEGER DEFAULT 15,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create enrollments table
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS enrollments (
     id SERIAL PRIMARY KEY,
     student_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     subject_id INTEGER REFERENCES subjects(id) ON DELETE CASCADE,
-    enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    enrolled_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(student_id, subject_id)
 );
 
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS attendance_sessions (
     session_time TIME NOT NULL,
     is_active BOOLEAN DEFAULT true,
     attendance_qr TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create attendance_records table
@@ -51,10 +51,10 @@ CREATE TABLE IF NOT EXISTS attendance_records (
     id SERIAL PRIMARY KEY,
     session_id INTEGER REFERENCES attendance_sessions(id) ON DELETE CASCADE,
     student_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    check_in_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    check_out_time TIMESTAMP,
+    check_in_time TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    check_out_time TIMESTAMPTZ,
     status VARCHAR(50) NOT NULL CHECK (status IN ('present', 'late', 'absent', 'pending')),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(session_id, student_id)
 );
 
@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS manual_attendance_codes (
     type VARCHAR(10) NOT NULL CHECK (type IN ('in', 'out')),
     code VARCHAR(20) NOT NULL,
     used BOOLEAN DEFAULT false,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create indexes for better performance
@@ -80,15 +80,14 @@ CREATE INDEX IF NOT EXISTS idx_records_student ON attendance_records(student_id)
 
 -- Insert sample data for testing
 INSERT INTO users (unique_id, name, email, password_hash, role, student_id) VALUES
-('TEACHER-001', 'John Smith', 'john.smith@school.com', '$2b$10$rQZ9vYzX8K7L2M1N0O9P8Q7R6S5T4U3V2W1X0Y9Z8A7B6C5D4E3F2G1H0I', 'teacher', NULL),
-('STUDENT-001', 'Alice Johnson', 'alice.johnson@student.com', '$2b$10$rQZ9vYzX8K7L2M1N0O9P8Q7R6S5T4U3V2W1X0Y9Z8A7B6C5D4E3F2G1H0I', 'student', 'STU001'),
-('STUDENT-002', 'Bob Wilson', 'bob.wilson@student.com', '$2b$10$rQZ9vYzX8K7L2M1N0O9P8Q7R6S5T4U3V2W1X0Y9Z8A7B6C5D4E3F2G1H0I', 'student', 'STU002')
-ON CONFLICT (email) DO NOTHING;
+('TEACHER-001', 'Dr. John Smith', 'dr.smith@university.edu', '$2b$10$example_hash_1', 'teacher', NULL),
+('STUDENT-001', 'Alice Johnson', 'alice@student.edu', '$2b$10$example_hash_4', 'student', 'CS2021001'),
+('STUDENT-002', 'Bob Wilson', 'bob@student.edu', '$2b$10$example_hash_5', 'student', 'CS2021002')
+ON CONFLICT (unique_id) DO NOTHING;
 
--- Insert sample subjects
 INSERT INTO subjects (name, code, teacher_id, start_time, end_time, schedule_days, late_threshold) VALUES
-('Mathematics 101', 'MATH101', 1, '09:00:00', '10:30:00', ARRAY['Monday', 'Wednesday', 'Friday'], 15),
-('Computer Science', 'CS101', 1, '11:00:00', '12:30:00', ARRAY['Tuesday', 'Thursday'], 10)
+('Data Structures', 'CS201', 1, '10:00:00', '11:30:00', ARRAY['Monday', 'Wednesday', 'Friday'], 15),
+('Database Systems', 'CS301', 1, '14:00:00', '15:30:00', ARRAY['Tuesday', 'Thursday'], 10)
 ON CONFLICT (code) DO NOTHING;
 
 -- Insert sample enrollments

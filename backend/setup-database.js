@@ -17,7 +17,7 @@ const setupDatabase = async () => {
         password_hash VARCHAR(255) NOT NULL,
         role VARCHAR(50) NOT NULL CHECK (role IN ('student', 'teacher')),
         student_id VARCHAR(50),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
     console.log('✅ Users table created');
@@ -32,7 +32,7 @@ const setupDatabase = async () => {
         end_time TIME,
         schedule_days TEXT[],
         late_threshold INTEGER DEFAULT 15,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
     console.log('✅ Subjects table created');
@@ -42,7 +42,7 @@ const setupDatabase = async () => {
         id SERIAL PRIMARY KEY,
         student_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
         subject_id INTEGER REFERENCES subjects(id) ON DELETE CASCADE,
-        enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        enrolled_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(student_id, subject_id)
       );
     `);
@@ -56,7 +56,7 @@ const setupDatabase = async () => {
         session_time TIME NOT NULL,
         is_active BOOLEAN DEFAULT true,
         attendance_qr TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
     console.log('✅ Attendance sessions table created');
@@ -66,10 +66,10 @@ const setupDatabase = async () => {
         id SERIAL PRIMARY KEY,
         session_id INTEGER REFERENCES attendance_sessions(id) ON DELETE CASCADE,
         student_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        check_in_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        check_out_time TIMESTAMP,
+        check_in_time TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        check_out_time TIMESTAMPTZ,
         status VARCHAR(50) NOT NULL CHECK (status IN ('present', 'late', 'absent', 'pending')),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(session_id, student_id)
       );
     `);
@@ -82,20 +82,20 @@ const setupDatabase = async () => {
         type VARCHAR(10) NOT NULL CHECK (type IN ('in', 'out')),
         code VARCHAR(20) NOT NULL,
         used BOOLEAN DEFAULT false,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
     console.log('✅ Manual attendance codes table created');
 
     // Create indexes
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);');
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_subjects_teacher ON subjects(teacher_id);');
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_enrollments_student ON enrollments(student_id);');
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_enrollments_subject ON enrollments(subject_id);');
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_sessions_subject ON attendance_sessions(subject_id);');
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_sessions_active ON attendance_sessions(is_active);');
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_records_session ON attendance_records(session_id);');
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_records_student ON attendance_records(student_id);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_subjects_teacher ON subjects(teacher_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_enrollments_student ON enrollments(student_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_enrollments_subject ON enrollments(subject_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_sessions_subject ON attendance_sessions(subject_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_sessions_active ON attendance_sessions(is_active)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_records_session ON attendance_records(session_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_records_student ON attendance_records(student_id)');
     console.log('✅ Indexes created');
 
     // Insert sample data
