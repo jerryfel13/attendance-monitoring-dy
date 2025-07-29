@@ -93,16 +93,29 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
     try {
       const qrData = `ATTENDANCE_${subject.name.replace(/\s+/g, '_')}_${subject.code}_${new Date().toISOString().split('T')[0]}`
       setAttendanceQR(qrData)
+      
+      // Use the subject's scheduled start time instead of current time
+      let sessionTime = subject.start_time || '09:00:00' // Default to 9 AM if no start time set
+      
+      // If no start_time is set, use current time but format it properly
+      if (!subject.start_time) {
+        const now = new Date()
+        const hours = now.getHours().toString().padStart(2, '0')
+        const minutes = now.getMinutes().toString().padStart(2, '0')
+        const seconds = now.getSeconds().toString().padStart(2, '0')
+        sessionTime = `${hours}:${minutes}:${seconds}`
+      }
+      
       const data = await apiClient.teacher.startSession(id, {
         session_date: new Date().toISOString().split('T')[0],
-        session_time: new Date().toTimeString().split(' ')[0], // Use HH:MM:SS format
+        session_time: sessionTime, // Use subject's scheduled start time
         is_active: true,
         attendance_qr: qrData
       })
       if (data && data.session) {
         setSessionActive(true)
         setSessionId(data.session.id)
-        console.log('Attendance session started successfully')
+        console.log('Attendance session started successfully with time:', sessionTime)
       } else {
         console.error('Failed to start attendance session')
       }
