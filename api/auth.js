@@ -376,10 +376,44 @@ export default async function handler(req, res) {
             });
           }
         }
-        await pool.query(
-          'INSERT INTO attendance_records (session_id, student_id, status, check_in_time) VALUES ($1, $2, $3, NOW())',
-          [sessionId, studentId, 'pending']
+        
+        // Calculate late status immediately upon check-in
+        const session = sessionResult.rows[0];
+        const sessionStartTime = new Date(`${session.session_date}T${session.session_time}`);
+        const checkInTime = new Date();
+        const timeDifference = (checkInTime - sessionStartTime) / (1000 * 60);
+        
+        // Get subject late threshold
+        const subjectData = await pool.query(
+          'SELECT late_threshold FROM subjects WHERE id = $1',
+          [subjectId]
         );
+        
+        const lateThreshold = subjectData.rows[0]?.late_threshold || 15;
+        let isLate = false;
+        
+        console.log(`QR scan-in (old format) calculation for student ${studentId}:`);
+        console.log(`  - session_date: ${session.session_date}`);
+        console.log(`  - session_time: ${session.session_time}`);
+        console.log(`  - session_start_time: ${sessionStartTime}`);
+        console.log(`  - check_in_time: ${checkInTime}`);
+        console.log(`  - time_difference: ${timeDifference} minutes`);
+        console.log(`  - late_threshold: ${lateThreshold} minutes`);
+        
+        if (timeDifference > lateThreshold) {
+          isLate = true;
+          console.log(`  - RESULT: Student is LATE (${timeDifference} > ${lateThreshold})`);
+        } else {
+          console.log(`  - RESULT: Student is ON TIME (${timeDifference} <= ${lateThreshold})`);
+        }
+        
+        // Mark attendance as pending with late status immediately
+        console.log(`Inserting attendance record with is_late = ${isLate} (type: ${typeof isLate})`);
+        await pool.query(
+          'INSERT INTO attendance_records (session_id, student_id, status, check_in_time, is_late) VALUES ($1, $2, $3, NOW(), $4)',
+          [sessionId, studentId, 'pending', Boolean(isLate)]
+        );
+        
         return res.json({
           type: 'attendance',
           message: 'Scan-in successful. Please scan out at the end of class to confirm your attendance.',
@@ -460,10 +494,41 @@ export default async function handler(req, res) {
           }
         }
         
-        // Mark attendance as pending initially (will be finalized on scan-out)
+        // Calculate late status immediately upon check-in
+        const session = sessionResult.rows[0];
+        const sessionStartTime = new Date(`${session.session_date}T${session.session_time}`);
+        const checkInTime = new Date();
+        const timeDifference = (checkInTime - sessionStartTime) / (1000 * 60);
+        
+        // Get subject late threshold
+        const subjectData = await pool.query(
+          'SELECT late_threshold FROM subjects WHERE id = $1',
+          [subjectId]
+        );
+        
+        const lateThreshold = subjectData.rows[0]?.late_threshold || 15;
+        let isLate = false;
+        
+        console.log(`QR scan-in (new format) calculation for student ${studentId}:`);
+        console.log(`  - session_date: ${session.session_date}`);
+        console.log(`  - session_time: ${session.session_time}`);
+        console.log(`  - session_start_time: ${sessionStartTime}`);
+        console.log(`  - check_in_time: ${checkInTime}`);
+        console.log(`  - time_difference: ${timeDifference} minutes`);
+        console.log(`  - late_threshold: ${lateThreshold} minutes`);
+        
+        if (timeDifference > lateThreshold) {
+          isLate = true;
+          console.log(`  - RESULT: Student is LATE (${timeDifference} > ${lateThreshold})`);
+        } else {
+          console.log(`  - RESULT: Student is ON TIME (${timeDifference} <= ${lateThreshold})`);
+        }
+        
+        // Mark attendance as pending with late status immediately
+        console.log(`Inserting attendance record with is_late = ${isLate} (type: ${typeof isLate})`);
         await pool.query(
-          'INSERT INTO attendance_records (session_id, student_id, status, check_in_time) VALUES ($1, $2, $3, NOW())',
-          [sessionId, studentId, 'pending']
+          'INSERT INTO attendance_records (session_id, student_id, status, check_in_time, is_late) VALUES ($1, $2, $3, NOW(), $4)',
+          [sessionId, studentId, 'pending', Boolean(isLate)]
         );
         
         return res.json({
@@ -1139,9 +1204,10 @@ export default async function handler(req, res) {
         
         // Insert new attendance record with late status
         try {
+        console.log(`Manual scan-in: Inserting with is_late = ${isLate} (type: ${typeof isLate})`);
         await pool.query(
           'INSERT INTO attendance_records (session_id, student_id, status, check_in_time, is_late) VALUES ($1, $2, $3, NOW(), $4)',
-          [manualCode.session_id, studentId, 'pending', isLate]
+          [manualCode.session_id, studentId, 'pending', Boolean(isLate)]
         );
           console.log('Attendance record created successfully for student:', studentId, 'session:', manualCode.session_id);
           return res.json({ 
@@ -1185,9 +1251,10 @@ export default async function handler(req, res) {
         }
         
         // Update record with check_out_time, final status, and is_late flag
+        console.log(`Manual scan-out: Updating with is_late = ${isLate} (type: ${typeof isLate})`);
         await pool.query(
           'UPDATE attendance_records SET check_out_time = NOW(), status = $1, is_late = $2 WHERE id = $3',
-          [attendanceStatus, isLate, record.id]
+          [attendanceStatus, Boolean(isLate), record.id]
         );
         return res.json({ message: 'Manual scan-out successful. Your attendance is confirmed.' });
       } else {
@@ -1217,10 +1284,35 @@ export default async function handler(req, res) {
         if (status === 'pending') {
           // Set pending status with check-in time if not already set
           if (!existingRecord.check_in_time) {
-            await pool.query(
-              'UPDATE attendance_records SET status = $1, check_in_time = NOW() WHERE session_id = $2 AND student_id = $3',
-              [status, sessionId, studentId]
+            // Calculate late status for new check-in
+            const sessionData = await pool.query(
+              'SELECT s.session_date, s.session_time, sub.late_threshold FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
+              [sessionId]
             );
+            
+            if (sessionData.rows.length > 0) {
+              const session = sessionData.rows[0];
+              const sessionStartTime = new Date(`${session.session_date}T${session.session_time}`);
+              const checkInTime = new Date();
+              const timeDifference = (checkInTime - sessionStartTime) / (1000 * 60);
+              const lateThreshold = session.late_threshold || 15;
+              
+              let isLate = false;
+              if (timeDifference > lateThreshold) {
+                isLate = true;
+              }
+              
+              console.log(`Manual attendance update (pending): Updating with is_late = ${isLate} (type: ${typeof isLate})`);
+              await pool.query(
+                'UPDATE attendance_records SET status = $1, check_in_time = NOW(), is_late = $2 WHERE session_id = $3 AND student_id = $4',
+                [status, Boolean(isLate), sessionId, studentId]
+              );
+            } else {
+              await pool.query(
+                'UPDATE attendance_records SET status = $1, check_in_time = NOW() WHERE session_id = $2 AND student_id = $3',
+                [status, sessionId, studentId]
+              );
+            }
           } else {
         await pool.query(
           'UPDATE attendance_records SET status = $1 WHERE session_id = $2 AND student_id = $3',
@@ -1234,16 +1326,16 @@ export default async function handler(req, res) {
           if (existingRecord.check_in_time) {
             // Get session info for late threshold calculation
             const sessionData = await pool.query(
-              'SELECT s.session_date, sub.late_threshold, sub.start_time FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
+              'SELECT s.session_date, s.session_time, sub.late_threshold FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
               [sessionId]
             );
             
             if (sessionData.rows.length > 0) {
               const session = sessionData.rows[0];
               const lateThreshold = session.late_threshold || 15;
-              const scheduledStartTime = new Date(`${session.session_date}T${session.start_time}`);
+              const sessionStartTime = new Date(`${session.session_date}T${session.session_time}`);
               const checkInTime = new Date(existingRecord.check_in_time);
-              const timeDifference = (checkInTime.getTime() - scheduledStartTime.getTime()) / (1000 * 60);
+              const timeDifference = (checkInTime - sessionStartTime) / (1000 * 60);
               
               // Override status if check-in time indicates late
               if (timeDifference > lateThreshold) {
@@ -1254,10 +1346,12 @@ export default async function handler(req, res) {
             }
           }
           
-          // Set final status with check-out time
+          // Set final status with check-out time and is_late flag
+          const isLate = finalStatus === 'late';
+          console.log(`Manual attendance update: Updating with is_late = ${isLate} (type: ${typeof isLate})`);
           await pool.query(
-            'UPDATE attendance_records SET status = $1, check_out_time = NOW() WHERE session_id = $2 AND student_id = $3',
-            [finalStatus, sessionId, studentId]
+            'UPDATE attendance_records SET status = $1, check_out_time = NOW(), is_late = $2 WHERE session_id = $3 AND student_id = $4',
+            [finalStatus, Boolean(isLate), sessionId, studentId]
           );
         } else if (status === 'absent') {
           // Set absent status (no check-out time)
@@ -1267,12 +1361,37 @@ export default async function handler(req, res) {
           );
         }
       } else {
-        // Insert new record
+        // Insert new record with late calculation
         if (status === 'pending') {
-        await pool.query(
-          'INSERT INTO attendance_records (session_id, student_id, status, check_in_time) VALUES ($1, $2, $3, NOW())',
-          [sessionId, studentId, status]
-        );
+          // Calculate late status for pending
+          const sessionData = await pool.query(
+            'SELECT s.session_date, s.session_time, sub.late_threshold FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
+            [sessionId]
+          );
+          
+          if (sessionData.rows.length > 0) {
+            const session = sessionData.rows[0];
+            const sessionStartTime = new Date(`${session.session_date}T${session.session_time}`);
+            const checkInTime = new Date();
+            const timeDifference = (checkInTime - sessionStartTime) / (1000 * 60);
+            const lateThreshold = session.late_threshold || 15;
+            
+            let isLate = false;
+            if (timeDifference > lateThreshold) {
+              isLate = true;
+            }
+            
+            console.log(`Manual attendance update: Inserting with is_late = ${isLate} (type: ${typeof isLate})`);
+            await pool.query(
+              'INSERT INTO attendance_records (session_id, student_id, status, check_in_time, is_late) VALUES ($1, $2, $3, NOW(), $4)',
+              [sessionId, studentId, status, Boolean(isLate)]
+            );
+          } else {
+            await pool.query(
+              'INSERT INTO attendance_records (session_id, student_id, status, check_in_time) VALUES ($1, $2, $3, NOW())',
+              [sessionId, studentId, status]
+            );
+          }
         } else if (status === 'present' || status === 'late') {
           await pool.query(
             'INSERT INTO attendance_records (session_id, student_id, status, check_in_time, check_out_time) VALUES ($1, $2, $3, NOW(), NOW())',
