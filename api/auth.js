@@ -214,9 +214,30 @@ export default async function handler(req, res) {
       } else if (qrCode.startsWith("ATTENDANCE_OUT:")) {
         // SCAN-OUT logic
         const attendanceInfo = qrCode.replace("ATTENDANCE_OUT:", "").trim();
+        console.log('Attendance info after removing prefix:', attendanceInfo);
+        
         // Parse format: "Data Structures (CS201) - 2024-01-15"
-        const match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)\s*-\s*(.+)$/);
+        // Try multiple regex patterns for flexibility
+        let match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)\s*-\s*(.+)$/);
+        console.log('Regex match result (pattern 1):', match);
+        
         if (!match) {
+          // Try alternative pattern with more flexible spacing
+          match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)\s*[-]\s*(.+)$/);
+          console.log('Regex match result (pattern 2):', match);
+        }
+        
+        if (!match) {
+          // Try pattern without strict spacing
+          match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)\s*[-]\s*(.+)$/);
+          console.log('Regex match result (pattern 3):', match);
+        }
+        
+        if (!match) {
+          console.log('Failed to parse QR code format. Expected: "Subject Name (Code) - Date"');
+          console.log('Received:', attendanceInfo);
+          console.log('QR code length:', attendanceInfo.length);
+          console.log('QR code characters:', Array.from(attendanceInfo).map(c => c.charCodeAt(0)));
           return res.status(400).json({ error: 'Invalid attendance QR code format' });
         }
         const [, subjectName, subjectCode, date] = match;
@@ -435,14 +456,35 @@ export default async function handler(req, res) {
             message: 'Scan-in successful. Please scan out at the end of class to confirm your attendance.',
             success: true
           });
-        } else if (trimmedQrCode.startsWith("ATTENDANCE_OUT:")) {
-          // Handle scan-out with trimmed code
-          const attendanceInfo = trimmedQrCode.replace("ATTENDANCE_OUT:", "").trim();
-          const match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)\s*-\s*(.+)$/);
-          if (!match) {
-            return res.status(400).json({ error: 'Invalid attendance QR code format' });
-          }
-          const [, subjectName, subjectCode, date] = match;
+                 } else if (trimmedQrCode.startsWith("ATTENDANCE_OUT:")) {
+           // Handle scan-out with trimmed code
+           const attendanceInfo = trimmedQrCode.replace("ATTENDANCE_OUT:", "").trim();
+           console.log('Attendance info after removing prefix (trimmed):', attendanceInfo);
+           
+           // Try multiple regex patterns for flexibility
+           let match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)\s*-\s*(.+)$/);
+           console.log('Regex match result (trimmed, pattern 1):', match);
+           
+           if (!match) {
+             // Try alternative pattern with more flexible spacing
+             match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)\s*[-]\s*(.+)$/);
+             console.log('Regex match result (trimmed, pattern 2):', match);
+           }
+           
+           if (!match) {
+             // Try pattern without strict spacing
+             match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)\s*[-]\s*(.+)$/);
+             console.log('Regex match result (trimmed, pattern 3):', match);
+           }
+           
+           if (!match) {
+             console.log('Failed to parse QR code format (trimmed). Expected: "Subject Name (Code) - Date"');
+             console.log('Received (trimmed):', attendanceInfo);
+             console.log('QR code length (trimmed):', attendanceInfo.length);
+             console.log('QR code characters (trimmed):', Array.from(attendanceInfo).map(c => c.charCodeAt(0)));
+             return res.status(400).json({ error: 'Invalid attendance QR code format' });
+           }
+           const [, subjectName, subjectCode, date] = match;
           
           console.log('Scan-out QR Code (trimmed):', trimmedQrCode);
           console.log('Parsed subject name:', subjectName.trim());
