@@ -139,19 +139,25 @@ export default function ScanPage() {
         stopCamera()
       }
       
-      toast({
-        title: data.success ? "Success" : "Error",
-        description: data.message,
-        variant: data.success ? "default" : "destructive"
-      });
-      
-      // Force refresh the card after successful scan
+      // Force refresh the card immediately after successful scan
       if (data.success) {
-        // Small delay to ensure toast is shown before refresh
+        toast({
+          title: "Success",
+          description: data.message,
+          variant: "default"
+        });
+        
+        // Refresh immediately after toast is triggered
         setTimeout(() => {
           window.location.reload()
-        }, 1500)
+        }, 100)
       } else {
+        toast({
+          title: "Error",
+          description: data.message,
+          variant: "destructive"
+        });
+        
         // Clear processed codes after a delay to allow for new scans
         setTimeout(() => {
           setProcessedCodes(new Set())
@@ -306,19 +312,25 @@ export default function ScanPage() {
         // Add to processed codes to prevent duplicates
         setProcessedCodes(prev => new Set([...prev, manualCode.trim()]))
         
-        toast({
-          title: data.success ? "Success" : "Error",
-          description: data.message,
-          variant: data.success ? "default" : "destructive"
-        });
-        
-        // Force refresh the card after successful scan
+        // Force refresh the card immediately after successful scan
         if (data.success) {
-          // Small delay to ensure toast is shown before refresh
+          toast({
+            title: "Success",
+            description: data.message,
+            variant: "default"
+          });
+          
+          // Refresh immediately after toast is triggered
           setTimeout(() => {
             window.location.reload()
-          }, 1500)
+          }, 100)
         } else {
+          toast({
+            title: "Error",
+            description: data.message,
+            variant: "destructive"
+          });
+          
           // Clear processed codes after a delay to allow for new scans
           setTimeout(() => {
             setProcessedCodes(new Set())
@@ -337,19 +349,25 @@ export default function ScanPage() {
         // Add to processed codes to prevent duplicates
         setProcessedCodes(prev => new Set([...prev, manualCode.trim()]))
         
-        toast({
-          title: data.success ? "Success" : "Error",
-          description: data.message,
-          variant: data.success ? "default" : "destructive"
-        });
-        
-        // Force refresh the card after successful scan
+        // Force refresh the card immediately after successful scan
         if (data.success) {
-          // Small delay to ensure toast is shown before refresh
+          toast({
+            title: "Success",
+            description: data.message,
+            variant: "default"
+          });
+          
+          // Refresh immediately after toast is triggered
           setTimeout(() => {
             window.location.reload()
-          }, 1500)
+          }, 100)
         } else {
+          toast({
+            title: "Error",
+            description: data.message,
+            variant: "destructive"
+          });
+          
           // Clear processed codes after a delay to allow for new scans
           setTimeout(() => {
             setProcessedCodes(new Set())
