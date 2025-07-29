@@ -312,8 +312,23 @@ export default async function handler(req, res) {
           'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
           [subjectName.trim(), subjectCode.trim()]
         );
+        console.log('Subject query result (scan-out old format):', subjectResult.rows);
+        console.log('Looking for subject with name:', subjectName.trim(), 'and code:', subjectCode.trim());
+        
         if (subjectResult.rows.length === 0) {
           console.log('Subject not found for:', subjectName.trim(), subjectCode.trim());
+          
+          // Let's also check what subjects exist in the database
+          const allSubjects = await pool.query('SELECT name, code FROM subjects');
+          console.log('All subjects in database:', allSubjects.rows);
+          
+          // Let's also try a case-insensitive search
+          const caseInsensitiveResult = await pool.query(
+            'SELECT id FROM subjects WHERE LOWER(TRIM(name)) = LOWER($1) AND LOWER(TRIM(code)) = LOWER($2)',
+            [subjectName.trim(), subjectCode.trim()]
+          );
+          console.log('Case-insensitive query result:', caseInsensitiveResult.rows);
+          
           return res.status(404).json({ error: 'Subject not found' });
         }
         const subjectId = subjectResult.rows[0].id;
