@@ -261,9 +261,9 @@ export default function TeacherDashboard() {
                       <CardDescription>{subject.code}</CardDescription>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Badge variant={typeof subject.attendanceRate === 'number' && !isNaN(subject.attendanceRate) && subject.attendanceRate >= 80 ? "default" : "destructive"}>
-                        {typeof subject.attendanceRate === 'number' && !isNaN(subject.attendanceRate) ? `${subject.attendanceRate}%` : '-'}
-                      </Badge>
+                    <Badge variant={typeof subject.attendanceRate === 'number' && !isNaN(subject.attendanceRate) && subject.attendanceRate >= 80 ? "default" : "destructive"}>
+                      {typeof subject.attendanceRate === 'number' && !isNaN(subject.attendanceRate) ? `${subject.attendanceRate}%` : '-'}
+                    </Badge>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
