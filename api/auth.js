@@ -128,6 +128,185 @@ export default async function handler(req, res) {
           message: `Successfully enrolled in ${subjectName} (${subjectCode})!`,
           success: true
         });
+      } else if (qrCode.startsWith("ATTENDANCE_OUT_")) {
+        // SCAN-OUT logic (old format with underscores)
+        console.log('Processing ATTENDANCE_OUT_ QR code:', qrCode);
+        console.log('QR code starts with ATTENDANCE_OUT_:', qrCode.startsWith("ATTENDANCE_OUT_"));
+        console.log('QR code length:', qrCode.length);
+        console.log('QR code first 30 chars:', qrCode.substring(0, 30));
+        
+        // Try multiple parsing approaches
+        let subjectName, subjectCode, date;
+        
+        // Method 1: Standard parsing
+        const attendanceInfo = qrCode.replace("ATTENDANCE_OUT_", "").trim();
+        const parts = attendanceInfo.split('_');
+        console.log('After removing ATTENDANCE_OUT_:', attendanceInfo);
+        console.log('Split parts:', parts);
+        
+        if (parts.length >= 3) {
+          date = parts[parts.length - 1];
+          subjectCode = parts[parts.length - 2];
+          subjectName = parts.slice(0, -2).join(' ').replace(/_/g, ' ');
+        } else {
+          console.log('Invalid format - parts length:', parts.length);
+          console.log('Parts:', parts);
+          return res.status(400).json({ error: 'Invalid attendance QR code format' });
+        }
+        
+        console.log('Method 1 - Parsed subject name:', subjectName.trim());
+        console.log('Method 1 - Parsed subject code:', subjectCode.trim());
+        console.log('Method 1 - Parsed date:', date.trim());
+        
+        // Method 2: If subject name includes "OUT", try removing it
+        if (subjectName.trim().includes('OUT')) {
+          console.log('Subject name includes "OUT", trying Method 2...');
+          const alternativeSubjectName = subjectName.trim().replace(/OUT\s+/i, '').trim();
+          console.log('Method 2 - Alternative subject name:', alternativeSubjectName);
+          
+          // Try to find subject with alternative name
+          const alternativeResult = await pool.query(
+            'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
+            [alternativeSubjectName, subjectCode.trim()]
+          );
+          
+          if (alternativeResult.rows.length > 0) {
+            console.log('Found subject with Method 2!');
+            subjectName = alternativeSubjectName;
+          }
+        }
+        
+        const subjectResult = await pool.query(
+          'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
+          [subjectName.trim(), subjectCode.trim()]
+        );
+        console.log('Final parsed subject name:', subjectName.trim());
+        console.log('Final parsed subject code:', subjectCode.trim());
+        console.log('Subject query result (scan-out old format):', subjectResult.rows);
+        console.log('Looking for subject with name:', subjectName.trim(), 'and code:', subjectCode.trim());
+        
+        if (subjectResult.rows.length === 0) {
+          console.log('Subject not found for:', subjectName.trim(), subjectCode.trim());
+          
+          // Let's also check what subjects exist in the database
+          const allSubjects = await pool.query('SELECT name, code FROM subjects');
+          console.log('All subjects in database:', allSubjects.rows);
+          
+          // Let's also try a case-insensitive search
+          const caseInsensitiveResult = await pool.query(
+            'SELECT id FROM subjects WHERE LOWER(TRIM(name)) = LOWER($1) AND LOWER(TRIM(code)) = LOWER($2)',
+            [subjectName.trim(), subjectCode.trim()]
+          );
+          console.log('Case-insensitive query result:', caseInsensitiveResult.rows);
+          
+          // Try alternative parsing if the subject name includes "OUT"
+          if (subjectName.trim().includes('OUT')) {
+            console.log('Subject name includes "OUT", trying alternative parsing...');
+            const alternativeSubjectName = subjectName.trim().replace(/OUT\s+/i, '').trim();
+            console.log('Alternative subject name:', alternativeSubjectName);
+            
+            const alternativeResult = await pool.query(
+              'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
+              [alternativeSubjectName, subjectCode.trim()]
+            );
+            console.log('Alternative query result:', alternativeResult.rows);
+            
+            if (alternativeResult.rows.length > 0) {
+              console.log('Found subject with alternative parsing!');
+              const subjectId = alternativeResult.rows[0].id;
+              // Continue with the rest of the logic using this subjectId
+              // ... (we'll need to handle this case)
+            }
+          }
+          
+          return res.status(404).json({ error: 'Subject not found' });
+        }
+        const subjectId = subjectResult.rows[0].id;
+        const sessionResult = await pool.query(
+          'SELECT id FROM attendance_sessions WHERE subject_id = $1 AND is_active = true ORDER BY session_date DESC, session_time DESC LIMIT 1',
+          [subjectId]
+        );
+        console.log('Session query result (scan-out old format):', sessionResult.rows);
+        console.log('Looking for active sessions for subject ID:', subjectId);
+        
+        if (sessionResult.rows.length === 0) {
+          console.log('No active session found for subject ID:', subjectId);
+          
+          // Let's also check what sessions exist for this subject
+          const allSessions = await pool.query('SELECT id, is_active, session_date FROM attendance_sessions WHERE subject_id = $1', [subjectId]);
+          console.log('All sessions for this subject:', allSessions.rows);
+          
+          return res.status(404).json({ 
+            type: 'attendance',
+            message: 'No active attendance session found for this subject',
+            success: false 
+          });
+        }
+        const sessionId = sessionResult.rows[0].id;
+        const recordResult = await pool.query(
+          'SELECT id, check_in_time, status, check_out_time FROM attendance_records WHERE session_id = $1 AND student_id = $2',
+          [sessionId, studentId]
+        );
+        console.log('Record query result (scan-out old format):', recordResult.rows);
+        console.log('Looking for attendance records for session ID:', sessionId, 'and student ID:', studentId);
+        
+        if (recordResult.rows.length === 0) {
+          console.log('No scan-in record found for session ID:', sessionId, 'and student ID:', studentId);
+          
+          // Let's also check what records exist for this session
+          const allRecords = await pool.query('SELECT student_id, status FROM attendance_records WHERE session_id = $1', [sessionId]);
+          console.log('All records for this session:', allRecords.rows);
+          
+          return res.status(404).json({ 
+            type: 'attendance',
+            message: 'No scan-in record found. Please scan in first.',
+            success: false 
+          });
+        }
+        const record = recordResult.rows[0];
+        if (record.check_out_time) {
+          return res.status(409).json({
+            type: 'attendance',
+            message: 'Already scanned out for this session.',
+            success: false
+          });
+        }
+        if (record.status === 'present' || record.status === 'late') {
+          await pool.query(
+            'UPDATE attendance_records SET check_out_time = NOW() WHERE id = $1',
+            [record.id]
+          );
+          return res.json({
+            type: 'attendance',
+            message: 'Scan-out successful. Your attendance is confirmed.',
+            success: true
+          });
+        }
+        if (record.status === 'pending') {
+          const sessionData = await pool.query(
+            'SELECT s.session_time, s.session_date, sub.late_threshold, sub.start_time FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
+            [sessionId]
+          );
+          const session = sessionData.rows[0];
+          const lateThreshold = session.late_threshold || 15;
+          const scheduledStartTime = new Date(`${session.session_date}T${session.start_time}`);
+          const checkInTime = new Date(record.check_in_time);
+          const timeDifference = (checkInTime.getTime() - scheduledStartTime.getTime()) / (1000 * 60);
+          let attendanceStatus = 'present';
+          if (timeDifference > lateThreshold) {
+            attendanceStatus = 'late';
+          }
+          await pool.query(
+            'UPDATE attendance_records SET check_out_time = NOW(), status = $1 WHERE id = $2',
+            [attendanceStatus, record.id]
+          );
+        }
+        return res.json({
+          type: 'attendance',
+          message: 'Scan-out successful. Your attendance is confirmed.',
+          success: true
+        });
+
       } else if (qrCode.startsWith("ATTENDANCE_")) {
         // SCAN-IN logic (old format with underscores)
         const attendanceInfo = qrCode.replace("ATTENDANCE_", "").trim();
