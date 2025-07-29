@@ -139,6 +139,11 @@ export default function ScanPage() {
         variant: data.success ? "default" : "destructive"
       });
       
+      // Clear processed codes after a delay to allow for new scans
+      setTimeout(() => {
+        setProcessedCodes(new Set())
+      }, 3000)
+      
     } catch (error: any) {
       // Clear QR code on error too
       setQrCode("")
@@ -150,6 +155,11 @@ export default function ScanPage() {
       if (isCameraActive) {
         stopCamera()
       }
+      
+      // Clear processed codes after a delay to allow for new scans
+      setTimeout(() => {
+        setProcessedCodes(new Set())
+      }, 3000)
       
       // Handle specific error types with user-friendly messages
       let errorMessage = "Failed to process QR code. Please try again."
@@ -287,6 +297,11 @@ export default function ScanPage() {
           description: data.message,
           variant: data.success ? "default" : "destructive"
         });
+        
+        // Clear processed codes after a delay to allow for new scans
+        setTimeout(() => {
+          setProcessedCodes(new Set())
+        }, 3000)
       } else {
         // Use manual code endpoint for attendance codes
         const data = await apiClient.auth.submitManualCode({ 
@@ -305,6 +320,11 @@ export default function ScanPage() {
           description: data.message,
           variant: data.success ? "default" : "destructive"
         });
+        
+        // Clear processed codes after a delay to allow for new scans
+        setTimeout(() => {
+          setProcessedCodes(new Set())
+        }, 3000)
       }
     } catch (error: any) {
       // Clear manual code on error too
@@ -312,6 +332,11 @@ export default function ScanPage() {
       
       // Add to processed codes even on error to prevent retry spam
       setProcessedCodes(prev => new Set([...prev, manualCode.trim()]))
+      
+      // Clear processed codes after a delay to allow for new scans
+      setTimeout(() => {
+        setProcessedCodes(new Set())
+      }, 3000)
       
       // Handle specific error types with user-friendly messages
       let errorMessage = "Failed to process manual code. Please try again."
