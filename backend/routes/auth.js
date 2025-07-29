@@ -215,8 +215,43 @@ router.post('/subjects/:id/sessions', async (req, res) => {
   const { id } = req.params;
   const { session_date, session_time, is_active, attendance_qr } = req.body;
   
+  console.log('Creating session with data:', {
+    subject_id: id,
+    session_date,
+    session_time,
+    is_active,
+    attendance_qr
+  });
+  
   if (!session_date || !session_time) {
     return res.status(400).json({ error: 'Missing required fields' });
+  }
+  
+  // Validate and format session_time
+  let formattedSessionTime = session_time;
+  
+  // If session_time is not in HH:MM:SS format, try to convert it
+  if (typeof session_time === 'string' && !session_time.match(/^\d{2}:\d{2}:\d{2}$/)) {
+    console.log('Invalid session_time format received:', session_time);
+    
+    // Try to parse and format the time
+    try {
+      const timeMatch = session_time.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+      if (timeMatch) {
+        const hours = timeMatch[1].padStart(2, '0');
+        const minutes = timeMatch[2];
+        const seconds = timeMatch[3];
+        formattedSessionTime = `${hours}:${minutes}:${seconds}`;
+        console.log('Formatted session_time:', formattedSessionTime);
+      } else {
+        // If no valid time format found, use default
+        formattedSessionTime = '09:00:00';
+        console.log('Using default session_time:', formattedSessionTime);
+      }
+    } catch (error) {
+      console.log('Error formatting session_time, using default');
+      formattedSessionTime = '09:00:00';
+    }
   }
   
   try {
@@ -226,14 +261,18 @@ router.post('/subjects/:id/sessions', async (req, res) => {
       [id]
     );
     
+    console.log('Inserting session with formatted time:', formattedSessionTime);
+    
     // Create new attendance session
     const result = await pool.query(
       'INSERT INTO attendance_sessions (subject_id, session_date, session_time, is_active, attendance_qr) VALUES ($1, $2, $3, $4, $5) RETURNING id, session_date, session_time, is_active, attendance_qr',
-      [id, session_date, session_time, is_active || true, attendance_qr]
+      [id, session_date, formattedSessionTime, is_active || true, attendance_qr]
     );
     
+    console.log('Session created successfully:', result.rows[0]);
     res.status(201).json({ session: result.rows[0] });
   } catch (err) {
+    console.error('Error creating session:', err);
     res.status(500).json({ error: 'Failed to create session', details: err.message });
   }
 });
