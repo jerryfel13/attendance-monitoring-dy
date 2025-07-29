@@ -80,6 +80,8 @@ export default async function handler(req, res) {
     console.log('QR Code starts with ATTENDANCE_OUT:', qrCode.startsWith("ATTENDANCE_OUT:"));
     console.log('QR Code trimmed:', qrCode.trim());
     console.log('QR Code starts with ATTENDANCE_OUT (trimmed):', qrCode.trim().startsWith("ATTENDANCE_OUT:"));
+    console.log('QR Code first 20 characters:', qrCode.substring(0, 20));
+    console.log('QR Code character codes (first 20):', Array.from(qrCode.substring(0, 20)).map(c => `${c}:${c.charCodeAt(0)}`));
     
     try {
       if (qrCode.startsWith("SUBJECT:")) {
@@ -567,6 +569,143 @@ export default async function handler(req, res) {
             success: true
           });
         }
+        
+        // Final fallback - try to detect QR code type by content
+        console.log('Trying content-based detection...');
+        const lowerQrCode = qrCode.toLowerCase();
+        
+        if (lowerQrCode.includes('subject') || lowerQrCode.includes('enroll')) {
+          console.log('Detected as subject enrollment QR code');
+          // Handle as subject enrollment
+          const subjectInfo = qrCode.replace(/^.*?subject[:\s]*/i, "").trim();
+          const match = subjectInfo.match(/^(.+?)\s*\(([^)]+)\)/);
+          if (match) {
+            const [, subjectName, subjectCode] = match;
+            console.log('Parsed subject name:', subjectName.trim());
+            console.log('Parsed subject code:', subjectCode.trim());
+            
+            const subjectResult = await pool.query(
+              'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
+              [subjectName.trim(), subjectCode.trim()]
+            );
+            if (subjectResult.rows.length === 0) {
+              console.log('Subject not found for:', subjectName.trim(), subjectCode.trim());
+              return res.status(404).json({ error: 'Subject not found' });
+            }
+            const subjectId = subjectResult.rows[0].id;
+            const enrollmentCheck = await pool.query(
+              'SELECT id FROM enrollments WHERE student_id = $1 AND subject_id = $2',
+              [studentId, subjectId]
+            );
+            if (enrollmentCheck.rows.length > 0) {
+              return res.status(409).json({ 
+                type: 'enrollment',
+                message: `Already enrolled in ${subjectName} (${subjectCode})`,
+                success: false 
+              });
+            }
+            await pool.query(
+              'INSERT INTO enrollments (student_id, subject_id) VALUES ($1, $2)',
+              [studentId, subjectId]
+            );
+            return res.json({
+              type: 'enrollment',
+              message: `Successfully enrolled in ${subjectName} (${subjectCode})!`,
+              success: true
+            });
+          }
+        } else if (lowerQrCode.includes('attendance') || lowerQrCode.includes('scan')) {
+          console.log('Detected as attendance QR code');
+          // Handle as attendance QR code
+          const attendanceInfo = qrCode.replace(/^.*?attendance[:\s]*/i, "").trim();
+          const match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)\s*[-]\s*(.+)$/);
+          if (match) {
+            const [, subjectName, subjectCode, date] = match;
+            console.log('Parsed subject name:', subjectName.trim());
+            console.log('Parsed subject code:', subjectCode.trim());
+            console.log('Parsed date:', date.trim());
+            
+            const subjectResult = await pool.query(
+              'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
+              [subjectName.trim(), subjectCode.trim()]
+            );
+            if (subjectResult.rows.length === 0) {
+              console.log('Subject not found for:', subjectName.trim(), subjectCode.trim());
+              return res.status(404).json({ error: 'Subject not found' });
+            }
+            const subjectId = subjectResult.rows[0].id;
+            const sessionResult = await pool.query(
+              'SELECT id FROM attendance_sessions WHERE subject_id = $1 AND is_active = true ORDER BY session_date DESC, session_time DESC LIMIT 1',
+              [subjectId]
+            );
+            if (sessionResult.rows.length === 0) {
+              return res.status(404).json({ 
+                type: 'attendance',
+                message: 'No active attendance session found for this subject',
+                success: false 
+              });
+            }
+            const sessionId = sessionResult.rows[0].id;
+            const recordResult = await pool.query(
+              'SELECT id, check_in_time, status, check_out_time FROM attendance_records WHERE session_id = $1 AND student_id = $2',
+              [sessionId, studentId]
+            );
+            if (recordResult.rows.length === 0) {
+              return res.status(404).json({ 
+                type: 'attendance',
+                message: 'No scan-in record found. Please scan in first.',
+                success: false 
+              });
+            }
+            const record = recordResult.rows[0];
+            if (record.check_out_time) {
+              return res.status(409).json({
+                type: 'attendance',
+                message: 'Already scanned out for this session.',
+                success: false
+              });
+            }
+            if (record.status === 'present' || record.status === 'late') {
+              await pool.query(
+                'UPDATE attendance_records SET check_out_time = NOW() WHERE id = $1',
+                [record.id]
+              );
+              return res.json({
+                type: 'attendance',
+                message: 'Scan-out successful. Your attendance is confirmed.',
+                success: true
+              });
+            }
+            if (record.status === 'pending') {
+              const sessionData = await pool.query(
+                'SELECT s.session_time, s.session_date, sub.late_threshold, sub.start_time FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
+                [sessionId]
+              );
+              const session = sessionData.rows[0];
+              const lateThreshold = session.late_threshold || 15;
+              const scheduledStartTime = new Date(`${session.session_date}T${session.start_time}`);
+              const checkInTime = new Date(record.check_in_time);
+              const timeDifference = (checkInTime.getTime() - scheduledStartTime.getTime()) / (1000 * 60);
+              let attendanceStatus = 'present';
+              if (timeDifference > lateThreshold) {
+                attendanceStatus = 'late';
+              }
+              await pool.query(
+                'UPDATE attendance_records SET check_out_time = NOW(), status = $1 WHERE id = $2',
+                [attendanceStatus, record.id]
+              );
+            }
+            return res.json({
+              type: 'attendance',
+              message: 'Scan-out successful. Your attendance is confirmed.',
+              success: true
+            });
+          }
+        }
+        
+        console.log('QR code could not be parsed with any method');
+        console.log('Full QR code content:', qrCode);
+        console.log('QR code character codes:', Array.from(qrCode).map(c => `${c}:${c.charCodeAt(0)}`));
         
         return res.status(400).json({ 
           type: 'error',
