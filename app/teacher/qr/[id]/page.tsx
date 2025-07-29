@@ -95,7 +95,7 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
       setAttendanceQR(qrData)
       const data = await apiClient.teacher.startSession(id, {
         session_date: new Date().toISOString().split('T')[0],
-        session_time: new Date().toLocaleTimeString(),
+        session_time: new Date().toTimeString().split(' ')[0], // Use HH:MM:SS format
         is_active: true,
         attendance_qr: qrData
       })
