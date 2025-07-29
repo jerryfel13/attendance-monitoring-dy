@@ -857,7 +857,8 @@ router.post('/scan', async (req, res) => {
         });
       }
       
-      const sessionId = sessionResult.rows[0].id;
+      const session = sessionResult.rows[0];
+      const sessionId = session.id;
       
       // Check if already marked attendance
       const attendanceCheck = await pool.query(
@@ -896,14 +897,23 @@ router.post('/scan', async (req, res) => {
       const lateThreshold = subjectData.rows[0]?.late_threshold || 15;
       let isLate = false;
       
+      console.log(`Scan-in calculation for student ${studentId}:`);
+      console.log(`  - session_date: ${session.session_date}`);
+      console.log(`  - session_time: ${session.session_time}`);
+      console.log(`  - session_start_time: ${sessionStartTime}`);
+      console.log(`  - check_in_time: ${checkInTime}`);
+      console.log(`  - time_difference: ${timeDifference} minutes`);
+      console.log(`  - late_threshold: ${lateThreshold} minutes`);
+      
       if (timeDifference > lateThreshold) {
         isLate = true;
-        console.log(`Student ${studentId} is LATE: ${timeDifference} minutes > ${lateThreshold} threshold`);
+        console.log(`  - RESULT: Student is LATE (${timeDifference} > ${lateThreshold})`);
       } else {
-        console.log(`Student ${studentId} is ON TIME: ${timeDifference} minutes <= ${lateThreshold} threshold`);
+        console.log(`  - RESULT: Student is ON TIME (${timeDifference} <= ${lateThreshold})`);
       }
       
       // Mark attendance as pending with late status immediately
+      console.log(`Inserting attendance record with is_late = ${isLate}`);
       await pool.query(
         'INSERT INTO attendance_records (session_id, student_id, status, check_in_time, is_late) VALUES ($1, $2, $3, NOW(), $4)',
         [sessionId, studentId, 'pending', isLate]
