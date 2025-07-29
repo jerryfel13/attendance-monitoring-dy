@@ -108,21 +108,28 @@ export default async function handler(req, res) {
           message: `Successfully enrolled in ${subjectName} (${subjectCode})!`,
           success: true
         });
-      } else if (qrCode.startsWith("ATTENDANCE_")) {
+      } else if (qrCode.startsWith("ATTENDANCE:")) {
         // SCAN-IN logic
-        const attendanceInfo = qrCode.replace("ATTENDANCE_", "").trim();
-        const parts = attendanceInfo.split('_');
-        if (parts.length < 3) {
+        const attendanceInfo = qrCode.replace("ATTENDANCE:", "").trim();
+        // Parse format: "Data Structures (CS201) - 2024-01-15"
+        const match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)\s*-\s*(.+)$/);
+        if (!match) {
           return res.status(400).json({ error: 'Invalid attendance QR code format' });
         }
-        const date = parts[parts.length - 1];
-        const subjectCode = parts[parts.length - 2];
-        const subjectName = parts.slice(0, -2).join(' ').replace(/_/g, ' ');
+        const [, subjectName, subjectCode, date] = match;
+        
+        // Debug logging
+        console.log('Scan-in QR Code:', qrCode);
+        console.log('Parsed subject name:', subjectName.trim());
+        console.log('Parsed subject code:', subjectCode.trim());
+        console.log('Parsed date:', date.trim());
+        
         const subjectResult = await pool.query(
           'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
           [subjectName.trim(), subjectCode.trim()]
         );
         if (subjectResult.rows.length === 0) {
+          console.log('Subject not found for:', subjectName.trim(), subjectCode.trim());
           return res.status(404).json({ error: 'Subject not found' });
         }
         const subjectId = subjectResult.rows[0].id;
@@ -187,21 +194,28 @@ export default async function handler(req, res) {
           message: 'Scan-in successful. Please scan out at the end of class to confirm your attendance.',
           success: true
         });
-      } else if (qrCode.startsWith("ATTENDANCE_OUT_")) {
+      } else if (qrCode.startsWith("ATTENDANCE_OUT:")) {
         // SCAN-OUT logic
-        const attendanceInfo = qrCode.replace("ATTENDANCE_OUT_", "").trim();
-        const parts = attendanceInfo.split('_');
-        if (parts.length < 3) {
+        const attendanceInfo = qrCode.replace("ATTENDANCE_OUT:", "").trim();
+        // Parse format: "Data Structures (CS201) - 2024-01-15"
+        const match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)\s*-\s*(.+)$/);
+        if (!match) {
           return res.status(400).json({ error: 'Invalid attendance QR code format' });
         }
-        const date = parts[parts.length - 1];
-        const subjectCode = parts[parts.length - 2];
-        const subjectName = parts.slice(0, -2).join(' ').replace(/_/g, ' ');
+        const [, subjectName, subjectCode, date] = match;
+        
+        // Debug logging
+        console.log('Scan-out QR Code:', qrCode);
+        console.log('Parsed subject name:', subjectName.trim());
+        console.log('Parsed subject code:', subjectCode.trim());
+        console.log('Parsed date:', date.trim());
+        
         const subjectResult = await pool.query(
           'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
           [subjectName.trim(), subjectCode.trim()]
         );
         if (subjectResult.rows.length === 0) {
+          console.log('Subject not found for:', subjectName.trim(), subjectCode.trim());
           return res.status(404).json({ error: 'Subject not found' });
         }
         const subjectId = subjectResult.rows[0].id;

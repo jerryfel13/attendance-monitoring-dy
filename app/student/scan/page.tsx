@@ -205,9 +205,9 @@ export default function ScanPage() {
         if (error.response?.status === 409) {
           if (error.response?.data?.type === 'enrollment') {
             errorMessage = "You are already enrolled in this subject."
-          } else if (error.response?.data?.type === 'attendance') {
-            errorMessage = "You have already scanned for this session. Please scan out at the end of class."
-          } else {
+                  } else if (error.response?.data?.type === 'attendance') {
+          errorMessage = "Already scanned for this session. Please scan out at the end of class."
+        } else {
             errorMessage = "This QR code has already been used."
           }
         } else if (error.response?.status === 403) {
@@ -430,7 +430,7 @@ export default function ScanPage() {
         if (error.response?.data?.type === 'enrollment') {
           errorMessage = "You are already enrolled in this subject."
         } else if (error.response?.data?.type === 'attendance') {
-          errorMessage = "You have already scanned for this session. Please scan out at the end of class."
+          errorMessage = "Already scanned for this session. Please scan out at the end of class."
         } else {
           errorMessage = "This code has already been used."
         }
