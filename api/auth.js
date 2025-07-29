@@ -77,9 +77,10 @@ export default async function handler(req, res) {
     console.log('QR Code length:', qrCode.length);
     console.log('QR Code starts with SUBJECT:', qrCode.startsWith("SUBJECT:"));
     console.log('QR Code starts with ATTENDANCE:', qrCode.startsWith("ATTENDANCE:"));
-    console.log('QR Code starts with ATTENDANCE_OUT:', qrCode.startsWith("ATTENDANCE_OUT:"));
+    console.log('QR Code starts with ATTENDANCE_', qrCode.startsWith("ATTENDANCE_"));
+    console.log('QR Code starts with ATTENDANCE_OUT_', qrCode.startsWith("ATTENDANCE_OUT_"));
     console.log('QR Code trimmed:', qrCode.trim());
-    console.log('QR Code starts with ATTENDANCE_OUT (trimmed):', qrCode.trim().startsWith("ATTENDANCE_OUT:"));
+    console.log('QR Code starts with ATTENDANCE_OUT_ (trimmed):', qrCode.trim().startsWith("ATTENDANCE_OUT_"));
     console.log('QR Code first 20 characters:', qrCode.substring(0, 20));
     console.log('QR Code character codes (first 20):', Array.from(qrCode.substring(0, 20)).map(c => `${c}:${c.charCodeAt(0)}`));
     
@@ -320,7 +321,16 @@ export default async function handler(req, res) {
           'SELECT id FROM attendance_sessions WHERE subject_id = $1 AND is_active = true ORDER BY session_date DESC, session_time DESC LIMIT 1',
           [subjectId]
         );
+        console.log('Session query result (scan-out old format):', sessionResult.rows);
+        console.log('Looking for active sessions for subject ID:', subjectId);
+        
         if (sessionResult.rows.length === 0) {
+          console.log('No active session found for subject ID:', subjectId);
+          
+          // Let's also check what sessions exist for this subject
+          const allSessions = await pool.query('SELECT id, is_active, session_date FROM attendance_sessions WHERE subject_id = $1', [subjectId]);
+          console.log('All sessions for this subject:', allSessions.rows);
+          
           return res.status(404).json({ 
             type: 'attendance',
             message: 'No active attendance session found for this subject',
@@ -332,7 +342,16 @@ export default async function handler(req, res) {
           'SELECT id, check_in_time, status, check_out_time FROM attendance_records WHERE session_id = $1 AND student_id = $2',
           [sessionId, studentId]
         );
+        console.log('Record query result (scan-out old format):', recordResult.rows);
+        console.log('Looking for attendance records for session ID:', sessionId, 'and student ID:', studentId);
+        
         if (recordResult.rows.length === 0) {
+          console.log('No scan-in record found for session ID:', sessionId, 'and student ID:', studentId);
+          
+          // Let's also check what records exist for this session
+          const allRecords = await pool.query('SELECT student_id, status FROM attendance_records WHERE session_id = $1', [sessionId]);
+          console.log('All records for this session:', allRecords.rows);
+          
           return res.status(404).json({ 
             type: 'attendance',
             message: 'No scan-in record found. Please scan in first.',
@@ -382,128 +401,7 @@ export default async function handler(req, res) {
           message: 'Scan-out successful. Your attendance is confirmed.',
           success: true
         });
-      } else if (qrCode.startsWith("ATTENDANCE_OUT:")) {
-        // SCAN-OUT logic (new format)
-        const attendanceInfo = qrCode.replace("ATTENDANCE_OUT:", "").trim();
-        console.log('Attendance info after removing prefix:', attendanceInfo);
-        
-        // Parse format: "Data Structures (CS201) - 2024-01-15"
-        // Try multiple regex patterns for flexibility
-        let match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)\s*-\s*(.+)$/);
-        console.log('Regex match result (pattern 1):', match);
-        
-        if (!match) {
-          // Try alternative pattern with more flexible spacing
-          match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)\s*[-]\s*(.+)$/);
-          console.log('Regex match result (pattern 2):', match);
-        }
-        
-        if (!match) {
-          // Try pattern without strict spacing
-          match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)\s*[-]\s*(.+)$/);
-          console.log('Regex match result (pattern 3):', match);
-        }
-        
-        if (!match) {
-          console.log('Failed to parse QR code format. Expected: "Subject Name (Code) - Date"');
-          console.log('Received:', attendanceInfo);
-          console.log('QR code length:', attendanceInfo.length);
-          console.log('QR code characters:', Array.from(attendanceInfo).map(c => c.charCodeAt(0)));
-          return res.status(400).json({ error: 'Invalid attendance QR code format' });
-        }
-        const [, subjectName, subjectCode, date] = match;
-        
-        // Debug logging
-        console.log('Scan-out QR Code:', qrCode);
-        console.log('Parsed subject name:', subjectName.trim());
-        console.log('Parsed subject code:', subjectCode.trim());
-        console.log('Parsed date:', date.trim());
-        
-        const subjectResult = await pool.query(
-          'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
-          [subjectName.trim(), subjectCode.trim()]
-        );
-        if (subjectResult.rows.length === 0) {
-          console.log('Subject not found for:', subjectName.trim(), subjectCode.trim());
-          return res.status(404).json({ error: 'Subject not found' });
-        }
-        const subjectId = subjectResult.rows[0].id;
-        const sessionResult = await pool.query(
-          'SELECT id FROM attendance_sessions WHERE subject_id = $1 AND is_active = true ORDER BY session_date DESC, session_time DESC LIMIT 1',
-          [subjectId]
-        );
-        if (sessionResult.rows.length === 0) {
-          return res.status(404).json({ 
-            type: 'attendance',
-            message: 'No active attendance session found for this subject',
-            success: false 
-          });
-        }
-        const sessionId = sessionResult.rows[0].id;
-        // Get scan-in record - enhanced duplicate prevention
-        const recordResult = await pool.query(
-          'SELECT id, check_in_time, status, check_out_time FROM attendance_records WHERE session_id = $1 AND student_id = $2',
-          [sessionId, studentId]
-        );
-        if (recordResult.rows.length === 0) {
-          return res.status(404).json({ 
-            type: 'attendance',
-            message: 'No scan-in record found. Please scan in first.',
-            success: false 
-          });
-        }
-        const record = recordResult.rows[0];
-        
-        // Check if already scanned out
-        if (record.check_out_time) {
-          return res.status(409).json({
-            type: 'attendance',
-            message: 'Already scanned out for this session.',
-            success: false
-          });
-        }
-        
-        // If the record already has a final status (present/late), don't recalculate
-        if (record.status === 'present' || record.status === 'late') {
-          // Just update check_out_time, keep existing status
-          await pool.query(
-            'UPDATE attendance_records SET check_out_time = NOW() WHERE id = $1',
-            [record.id]
-          );
-          return res.json({
-            type: 'attendance',
-            message: 'Scan-out successful. Your attendance is confirmed.',
-            success: true
-          });
-        }
-        
-        // Only recalculate status if it was 'pending' (for backward compatibility)
-        if (record.status === 'pending') {
-          // Get session info for late threshold
-          const sessionData = await pool.query(
-            'SELECT s.session_time, s.session_date, sub.late_threshold, sub.start_time FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
-            [sessionId]
-          );
-          const session = sessionData.rows[0];
-          const lateThreshold = session.late_threshold || 15;
-          const scheduledStartTime = new Date(`${session.session_date}T${session.start_time}`);
-          const checkInTime = new Date(record.check_in_time);
-          const timeDifference = (checkInTime.getTime() - scheduledStartTime.getTime()) / (1000 * 60);
-          let attendanceStatus = 'present';
-          if (timeDifference > lateThreshold) {
-            attendanceStatus = 'late';
-          }
-          // Update record with check_out_time and final status
-          await pool.query(
-            'UPDATE attendance_records SET check_out_time = NOW(), status = $1 WHERE id = $2',
-            [attendanceStatus, record.id]
-          );
-        }
-        return res.json({
-          type: 'attendance',
-          message: 'Scan-out successful. Your attendance is confirmed.',
-          success: true
-        });
+
       } else {
         // Try with trimmed QR code as fallback
         const trimmedQrCode = qrCode.trim();
@@ -627,116 +525,7 @@ export default async function handler(req, res) {
             message: 'Scan-in successful. Please scan out at the end of class to confirm your attendance.',
             success: true
           });
-                 } else if (trimmedQrCode.startsWith("ATTENDANCE_OUT:")) {
-           // Handle scan-out with trimmed code
-           const attendanceInfo = trimmedQrCode.replace("ATTENDANCE_OUT:", "").trim();
-           console.log('Attendance info after removing prefix (trimmed):', attendanceInfo);
-           
-           // Try multiple regex patterns for flexibility
-           let match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)\s*-\s*(.+)$/);
-           console.log('Regex match result (trimmed, pattern 1):', match);
-           
-           if (!match) {
-             // Try alternative pattern with more flexible spacing
-             match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)\s*[-]\s*(.+)$/);
-             console.log('Regex match result (trimmed, pattern 2):', match);
-           }
-           
-           if (!match) {
-             // Try pattern without strict spacing
-             match = attendanceInfo.match(/^(.+?)\s*\(([^)]+)\)\s*[-]\s*(.+)$/);
-             console.log('Regex match result (trimmed, pattern 3):', match);
-           }
-           
-           if (!match) {
-             console.log('Failed to parse QR code format (trimmed). Expected: "Subject Name (Code) - Date"');
-             console.log('Received (trimmed):', attendanceInfo);
-             console.log('QR code length (trimmed):', attendanceInfo.length);
-             console.log('QR code characters (trimmed):', Array.from(attendanceInfo).map(c => c.charCodeAt(0)));
-             return res.status(400).json({ error: 'Invalid attendance QR code format' });
-           }
-           const [, subjectName, subjectCode, date] = match;
-          
-          console.log('Scan-out QR Code (trimmed):', trimmedQrCode);
-          console.log('Parsed subject name:', subjectName.trim());
-          console.log('Parsed subject code:', subjectCode.trim());
-          console.log('Parsed date:', date.trim());
-          
-          const subjectResult = await pool.query(
-            'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
-            [subjectName.trim(), subjectCode.trim()]
-          );
-          if (subjectResult.rows.length === 0) {
-            console.log('Subject not found for:', subjectName.trim(), subjectCode.trim());
-            return res.status(404).json({ error: 'Subject not found' });
-          }
-          const subjectId = subjectResult.rows[0].id;
-          const sessionResult = await pool.query(
-            'SELECT id FROM attendance_sessions WHERE subject_id = $1 AND is_active = true ORDER BY session_date DESC, session_time DESC LIMIT 1',
-            [subjectId]
-          );
-          if (sessionResult.rows.length === 0) {
-            return res.status(404).json({ 
-              type: 'attendance',
-              message: 'No active attendance session found for this subject',
-              success: false 
-            });
-          }
-          const sessionId = sessionResult.rows[0].id;
-          const recordResult = await pool.query(
-            'SELECT id, check_in_time, status, check_out_time FROM attendance_records WHERE session_id = $1 AND student_id = $2',
-            [sessionId, studentId]
-          );
-          if (recordResult.rows.length === 0) {
-            return res.status(404).json({ 
-              type: 'attendance',
-              message: 'No scan-in record found. Please scan in first.',
-              success: false 
-            });
-          }
-          const record = recordResult.rows[0];
-          if (record.check_out_time) {
-            return res.status(409).json({
-              type: 'attendance',
-              message: 'Already scanned out for this session.',
-              success: false
-            });
-          }
-          if (record.status === 'present' || record.status === 'late') {
-            await pool.query(
-              'UPDATE attendance_records SET check_out_time = NOW() WHERE id = $1',
-              [record.id]
-            );
-            return res.json({
-              type: 'attendance',
-              message: 'Scan-out successful. Your attendance is confirmed.',
-              success: true
-            });
-          }
-          if (record.status === 'pending') {
-            const sessionData = await pool.query(
-              'SELECT s.session_time, s.session_date, sub.late_threshold, sub.start_time FROM attendance_sessions s JOIN subjects sub ON s.subject_id = sub.id WHERE s.id = $1',
-              [sessionId]
-            );
-            const session = sessionData.rows[0];
-            const lateThreshold = session.late_threshold || 15;
-            const scheduledStartTime = new Date(`${session.session_date}T${session.start_time}`);
-            const checkInTime = new Date(record.check_in_time);
-            const timeDifference = (checkInTime.getTime() - scheduledStartTime.getTime()) / (1000 * 60);
-            let attendanceStatus = 'present';
-            if (timeDifference > lateThreshold) {
-              attendanceStatus = 'late';
-            }
-            await pool.query(
-              'UPDATE attendance_records SET check_out_time = NOW(), status = $1 WHERE id = $2',
-              [attendanceStatus, record.id]
-            );
-          }
-          return res.json({
-            type: 'attendance',
-            message: 'Scan-out successful. Your attendance is confirmed.',
-            success: true
-          });
+                 
         }
         
         // Final fallback - try to detect QR code type by content
