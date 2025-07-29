@@ -294,24 +294,53 @@ export default async function handler(req, res) {
         });
       } else if (qrCode.startsWith("ATTENDANCE_OUT_")) {
         // SCAN-OUT logic (old format with underscores)
+        console.log('Processing ATTENDANCE_OUT_ QR code:', qrCode);
+        
+        // Try multiple parsing approaches
+        let subjectName, subjectCode, date;
+        
+        // Method 1: Standard parsing
         const attendanceInfo = qrCode.replace("ATTENDANCE_OUT_", "").trim();
         const parts = attendanceInfo.split('_');
-        if (parts.length < 3) {
+        console.log('After removing ATTENDANCE_OUT_:', attendanceInfo);
+        console.log('Split parts:', parts);
+        
+        if (parts.length >= 3) {
+          date = parts[parts.length - 1];
+          subjectCode = parts[parts.length - 2];
+          subjectName = parts.slice(0, -2).join(' ').replace(/_/g, ' ');
+        } else {
           return res.status(400).json({ error: 'Invalid attendance QR code format' });
         }
-        const date = parts[parts.length - 1];
-        const subjectCode = parts[parts.length - 2];
-        const subjectName = parts.slice(0, -2).join(' ').replace(/_/g, ' ');
         
-        console.log('Scan-out QR Code (old format):', qrCode);
-        console.log('Parsed subject name:', subjectName.trim());
-        console.log('Parsed subject code:', subjectCode.trim());
-        console.log('Parsed date:', date.trim());
+        console.log('Method 1 - Parsed subject name:', subjectName.trim());
+        console.log('Method 1 - Parsed subject code:', subjectCode.trim());
+        console.log('Method 1 - Parsed date:', date.trim());
+        
+        // Method 2: If subject name includes "OUT", try removing it
+        if (subjectName.trim().includes('OUT')) {
+          console.log('Subject name includes "OUT", trying Method 2...');
+          const alternativeSubjectName = subjectName.trim().replace(/OUT\s+/i, '').trim();
+          console.log('Method 2 - Alternative subject name:', alternativeSubjectName);
+          
+          // Try to find subject with alternative name
+          const alternativeResult = await pool.query(
+            'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
+            [alternativeSubjectName, subjectCode.trim()]
+          );
+          
+          if (alternativeResult.rows.length > 0) {
+            console.log('Found subject with Method 2!');
+            subjectName = alternativeSubjectName;
+          }
+        }
         
         const subjectResult = await pool.query(
           'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
           [subjectName.trim(), subjectCode.trim()]
         );
+        console.log('Final parsed subject name:', subjectName.trim());
+        console.log('Final parsed subject code:', subjectCode.trim());
         console.log('Subject query result (scan-out old format):', subjectResult.rows);
         console.log('Looking for subject with name:', subjectName.trim(), 'and code:', subjectCode.trim());
         
@@ -328,6 +357,26 @@ export default async function handler(req, res) {
             [subjectName.trim(), subjectCode.trim()]
           );
           console.log('Case-insensitive query result:', caseInsensitiveResult.rows);
+          
+          // Try alternative parsing if the subject name includes "OUT"
+          if (subjectName.trim().includes('OUT')) {
+            console.log('Subject name includes "OUT", trying alternative parsing...');
+            const alternativeSubjectName = subjectName.trim().replace(/OUT\s+/i, '').trim();
+            console.log('Alternative subject name:', alternativeSubjectName);
+            
+            const alternativeResult = await pool.query(
+              'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
+              [alternativeSubjectName, subjectCode.trim()]
+            );
+            console.log('Alternative query result:', alternativeResult.rows);
+            
+            if (alternativeResult.rows.length > 0) {
+              console.log('Found subject with alternative parsing!');
+              const subjectId = alternativeResult.rows[0].id;
+              // Continue with the rest of the logic using this subjectId
+              // ... (we'll need to handle this case)
+            }
+          }
           
           return res.status(404).json({ error: 'Subject not found' });
         }
