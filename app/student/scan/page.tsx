@@ -25,6 +25,8 @@ export default function ScanPage() {
   const [manualCode, setManualCode] = useState("");
   const [manualSubmitting, setManualSubmitting] = useState(false);
   const [processedCodes, setProcessedCodes] = useState<Set<string>>(new Set());
+  const [scanSuccess, setScanSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -139,18 +141,22 @@ export default function ScanPage() {
         stopCamera()
       }
       
-      // Force refresh the card immediately after successful scan
+      // Show success message and keep toast visible longer
       if (data.success) {
+        setScanSuccess(true);
+        setSuccessMessage(data.message);
+        
         toast({
           title: "Success",
           description: data.message,
-          variant: "default"
+          variant: "default",
+          duration: 5000 // Show toast for 5 seconds
         });
         
-        // Refresh immediately after toast is triggered
+        // Refresh after a longer delay to let user see the success
         setTimeout(() => {
           window.location.reload()
-        }, 100)
+        }, 3000)
       } else {
         toast({
           title: "Error",
@@ -214,15 +220,7 @@ export default function ScanPage() {
     }
   }
 
-  const simulateCamera = () => {
-    const mockQRCodes = [
-      "SUBJECT_Data_Structures_CS201",
-      "ATTENDANCE_Database_Systems_CS301_2024-01-15",
-      "SUBJECT_Web_Development_CS401",
-    ]
-    const randomQR = mockQRCodes[Math.floor(Math.random() * mockQRCodes.length)]
-    setQrCode(randomQR)
-  }
+
 
   // Skeleton loading component
   const ScanSkeleton = () => (
@@ -312,18 +310,22 @@ export default function ScanPage() {
         // Add to processed codes to prevent duplicates
         setProcessedCodes(prev => new Set([...prev, manualCode.trim()]))
         
-        // Force refresh the card immediately after successful scan
+        // Show success message and keep toast visible longer
         if (data.success) {
+          setScanSuccess(true);
+          setSuccessMessage(data.message);
+          
           toast({
             title: "Success",
             description: data.message,
-            variant: "default"
+            variant: "default",
+            duration: 5000 // Show toast for 5 seconds
           });
           
-          // Refresh immediately after toast is triggered
+          // Refresh after a longer delay to let user see the success
           setTimeout(() => {
             window.location.reload()
-          }, 100)
+          }, 3000)
         } else {
           toast({
             title: "Error",
@@ -349,18 +351,22 @@ export default function ScanPage() {
         // Add to processed codes to prevent duplicates
         setProcessedCodes(prev => new Set([...prev, manualCode.trim()]))
         
-        // Force refresh the card immediately after successful scan
+        // Show success message and keep toast visible longer
         if (data.success) {
+          setScanSuccess(true);
+          setSuccessMessage(data.message);
+          
           toast({
             title: "Success",
             description: data.message,
-            variant: "default"
+            variant: "default",
+            duration: 5000 // Show toast for 5 seconds
           });
           
-          // Refresh immediately after toast is triggered
+          // Refresh after a longer delay to let user see the success
           setTimeout(() => {
             window.location.reload()
-          }, 100)
+          }, 3000)
         } else {
           toast({
             title: "Error",
@@ -460,6 +466,16 @@ export default function ScanPage() {
               <CardDescription>Point your camera at the QR code or enter the code manually</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Success message display */}
+              {scanSuccess && (
+                <Alert className="border-green-200 bg-green-50">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="text-green-800">
+                    {successMessage}
+                  </AlertDescription>
+                </Alert>
+              )}
+              
               {/* Always render the qr-reader div, but only show it when camera is active */}
               <div id="qr-reader" className={isCameraActive ? "w-full" : "hidden"}></div>
               {!isCameraActive ? (
