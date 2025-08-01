@@ -32,6 +32,8 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
   const [manualOutLoading, setManualOutLoading] = useState(false);
   const [pendingCodes, setPendingCodes] = useState<any[]>([]);
   const [pendingCodesLoading, setPendingCodesLoading] = useState(false);
+  const [searchStudent, setSearchStudent] = useState<string>("");
+  const [searchedCode, setSearchedCode] = useState<any>(null);
   const [qrPreviewOpen, setQrPreviewOpen] = useState(false);
   const [previewQrData, setPreviewQrData] = useState("");
   const [previewQrTitle, setPreviewQrTitle] = useState("");
@@ -173,6 +175,9 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
     try {
       const data = await apiClient.auth.generatePendingCodes({ sessionId: String(sessionId), type });
       setPendingCodes(data.codes || []);
+      // Clear search when generating new codes
+      setSearchStudent("");
+      setSearchedCode(null);
       toast({
         title: "Success",
         description: data.message,
@@ -191,6 +196,20 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
 
   const clearPendingCodes = () => {
     setPendingCodes([]);
+  };
+
+  const searchStudentCode = () => {
+    if (!searchStudent.trim() || pendingCodes.length === 0) {
+      setSearchedCode(null);
+      return;
+    }
+    
+    const foundCode = pendingCodes.find(code => 
+      code.studentName.toLowerCase().includes(searchStudent.toLowerCase()) ||
+      code.studentNumber.toLowerCase().includes(searchStudent.toLowerCase())
+    );
+    
+    setSearchedCode(foundCode || null);
   };
 
   // Clear codes when switching tabs
@@ -509,21 +528,58 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                       >
                         {pendingCodesLoading ? 'Generating...' : 'Generate Codes for All Enrolled Students (In)'}
                       </Button>
+                      
                       {pendingCodes.length > 0 && (
                         <div className="mt-4">
-                          <h4 className="font-medium mb-2">Student Codes:</h4>
-                          <div className="space-y-2 max-h-40 overflow-y-auto">
-                            {pendingCodes.map((codeData, index) => (
-                              <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                                <div className="flex-1">
-                                  <div className="font-medium text-sm">{codeData.studentName}</div>
-                                  <div className="text-xs text-gray-500">ID: {codeData.studentNumber}</div>
+                          <div className="bg-blue-50 p-3 rounded-lg mb-4">
+                            <h4 className="font-medium text-blue-900 mb-2">🔒 Secure Code Distribution</h4>
+                            <p className="text-sm text-blue-800 mb-3">
+                              Codes are hidden to prevent sharing. Search for a specific student to reveal their code.
+                            </p>
+                            <div className="flex space-x-2">
+                              <input
+                                type="text"
+                                placeholder="Search by student name or ID..."
+                                value={searchStudent}
+                                onChange={(e) => setSearchStudent(e.target.value)}
+                                className="flex-1 px-3 py-2 border rounded text-sm"
+                              />
+                              <Button 
+                                onClick={searchStudentCode}
+                                size="sm"
+                                className="bg-blue-600 hover:bg-blue-700"
+                              >
+                                Search
+                              </Button>
+                            </div>
+                          </div>
+                          
+                          {searchedCode && (
+                            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                              <h5 className="font-medium text-green-900 mb-2">Found Student:</h5>
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="font-medium">{searchedCode.studentName}</div>
+                                  <div className="text-sm text-gray-600">ID: {searchedCode.studentNumber}</div>
                                 </div>
-                                <span className="font-mono text-lg bg-white px-3 py-1 rounded border">
-                                  {codeData.code}
-                                </span>
+                                <div className="text-right">
+                                  <div className="text-xs text-gray-500 mb-1">Attendance Code:</div>
+                                  <span className="font-mono text-lg bg-white px-3 py-2 rounded border">
+                                    {searchedCode.code}
+                                  </span>
+                                </div>
                               </div>
-                            ))}
+                            </div>
+                          )}
+                          
+                          <div className="mt-4">
+                            <h4 className="font-medium mb-2">📋 Generated Codes Summary:</h4>
+                            <div className="text-sm text-gray-600">
+                              • Total codes generated: <span className="font-medium">{pendingCodes.length}</span>
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              • Search above to find specific student codes
+                            </div>
                           </div>
                         </div>
                       )}
@@ -616,6 +672,9 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                       >
                         {pendingCodesLoading ? 'Generating...' : 'Generate Codes for Pending Students (Out)'}
                       </Button>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Note: Attendance-out codes are visible for all pending students since they need to scan out.
+                      </div>
                       {pendingCodes.length > 0 && (
                         <div className="mt-4">
                           <h4 className="font-medium mb-2">Pending Student Codes:</h4>
