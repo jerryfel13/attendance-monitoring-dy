@@ -128,6 +128,52 @@ export default async function handler(req, res) {
           message: `Successfully enrolled in ${subjectName} (${subjectCode})!`,
           success: true
         });
+      } else if (qrCode.startsWith("SUBJECT_")) {
+        // Handle SUBJECT_ format (manual codes)
+        console.log('Processing SUBJECT_ QR code:', qrCode);
+        const subjectInfo = qrCode.replace("SUBJECT_", "").trim();
+        const parts = subjectInfo.split('_');
+        
+        if (parts.length < 2) {
+          return res.status(400).json({ error: 'Invalid subject QR code format' });
+        }
+        
+        // Last part is the subject code, everything else is the subject name
+        const subjectCode = parts[parts.length - 1];
+        const subjectName = parts.slice(0, -1).join(' ').replace(/_/g, ' ');
+        
+        console.log('SUBJECT_ - Parsed subject name:', subjectName.trim());
+        console.log('SUBJECT_ - Parsed subject code:', subjectCode.trim());
+        
+        const subjectResult = await pool.query(
+          'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
+          [subjectName.trim(), subjectCode.trim()]
+        );
+        if (subjectResult.rows.length === 0) {
+          console.log('Subject not found for:', subjectName.trim(), subjectCode.trim());
+          return res.status(404).json({ error: 'Subject not found' });
+        }
+        const subjectId = subjectResult.rows[0].id;
+        const enrollmentCheck = await pool.query(
+          'SELECT id FROM enrollments WHERE student_id = $1 AND subject_id = $2',
+          [studentId, subjectId]
+        );
+        if (enrollmentCheck.rows.length > 0) {
+          return res.status(409).json({ 
+            type: 'enrollment',
+            message: `Already enrolled in ${subjectName} (${subjectCode})`,
+            success: false 
+          });
+        }
+        await pool.query(
+          'INSERT INTO enrollments (student_id, subject_id) VALUES ($1, $2)',
+          [studentId, subjectId]
+        );
+        return res.json({
+          type: 'enrollment',
+          message: `Successfully enrolled in ${subjectName} (${subjectCode})!`,
+          success: true
+        });
       } else if (qrCode.startsWith("ATTENDANCE_OUT_")) {
         // SCAN-OUT logic (old format with underscores)
         console.log('Processing ATTENDANCE_OUT_ QR code:', qrCode);
