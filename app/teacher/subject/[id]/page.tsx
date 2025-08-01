@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Users, Clock, Calendar, TrendingUp, AlertTriangle, User, LogOut, QrCode, Search } from "lucide-react"
+import { ArrowLeft, Users, Clock, Calendar, TrendingUp, AlertTriangle, User, LogOut, QrCode, Search, RotateCcw } from "lucide-react"
 import Link from "next/link"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -57,6 +57,9 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [removingStudentId, setRemovingStudentId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [pendingStudents, setPendingStudents] = useState<any[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -113,6 +116,11 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
       setSessionAttendance([]);
     }
   }, [selectedAttendanceSessionId]);
+
+  // Update pending students when session attendance changes
+  useEffect(() => {
+    updatePendingStudents();
+  }, [sessionAttendance, selectedSessionId]);
 
   const handleLogout = () => {
     localStorage.removeItem("user")
@@ -185,6 +193,59 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
     } finally {
       setRemovingStudentId(null);
     }
+  };
+
+  const spinWheel = () => {
+    if (pendingStudents.length === 0) {
+      toast({
+        title: "No pending students",
+        description: "There are no pending students for recitation.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSpinning(true);
+    setSelectedStudent(null);
+
+    // Simulate spinning animation
+    const spinDuration = 3000; // 3 seconds
+    const spinInterval = 100; // Change every 100ms
+    const iterations = spinDuration / spinInterval;
+    let currentIteration = 0;
+
+    const spinIntervalId = setInterval(() => {
+      const randomIndex = Math.floor(Math.random() * pendingStudents.length);
+      setSelectedStudent(pendingStudents[randomIndex]);
+      currentIteration++;
+
+      if (currentIteration >= iterations) {
+        clearInterval(spinIntervalId);
+        setIsSpinning(false);
+        
+        // Final selection
+        const finalIndex = Math.floor(Math.random() * pendingStudents.length);
+        const finalStudent = pendingStudents[finalIndex];
+        setSelectedStudent(finalStudent);
+        
+        toast({
+          title: "Student Selected!",
+          description: `${finalStudent.name} has been selected for recitation.`,
+          variant: "default"
+        });
+      }
+    }, spinInterval);
+  };
+
+  const updatePendingStudents = () => {
+    if (!selectedSessionId) {
+      setPendingStudents([]);
+      return;
+    }
+
+    // Get pending students from the current session attendance
+    const pending = sessionAttendance.filter((student: any) => student.status === 'pending');
+    setPendingStudents(pending);
   };
 
   function exportAttendanceToExcel() {
@@ -522,6 +583,73 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
                   <div className="flex gap-2 mt-4">
                     <Button onClick={exportAttendanceToExcel} variant="outline">Export to Excel</Button>
                     <Button onClick={exportAttendanceToPDF} variant="outline">Export to PDF</Button>
+                  </div>
+                )}
+                
+                {/* Spin Wheel for Recitation */}
+                {selectedSessionId && (
+                  <div className="mt-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-purple-900">🎯 Recitation Spin Wheel</h3>
+                        <p className="text-sm text-purple-700">Randomly select a pending student for recitation</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-purple-900">
+                          {pendingStudents.length} pending students
+                        </div>
+                        <div className="text-xs text-purple-600">Available for selection</div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-center mb-4">
+                      <div className="relative">
+                        <div className={`w-32 h-32 rounded-full border-4 border-purple-300 bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center transition-all duration-300 ${isSpinning ? 'animate-spin' : ''}`}>
+                          {selectedStudent ? (
+                            <div className="text-center">
+                              <div className="text-lg font-bold text-purple-900">{selectedStudent.name}</div>
+                              <div className="text-xs text-purple-600">{selectedStudent.student_id}</div>
+                            </div>
+                          ) : (
+                            <div className="text-center text-purple-600">
+                              <RotateCcw className="w-8 h-8 mx-auto mb-2" />
+                              <div className="text-sm">Click to spin</div>
+                            </div>
+                          )}
+                        </div>
+                        {isSpinning && (
+                          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-500 animate-spin"></div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-center">
+                      <Button 
+                        onClick={spinWheel}
+                        disabled={isSpinning || pendingStudents.length === 0}
+                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                      >
+                        <RotateCcw className={`w-4 h-4 mr-2 ${isSpinning ? 'animate-spin' : ''}`} />
+                        {isSpinning ? 'Spinning...' : 'Spin for Recitation'}
+                      </Button>
+                    </div>
+                    
+                    {pendingStudents.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-medium text-purple-900 mb-2">Pending Students:</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {pendingStudents.map((student: any) => (
+                            <Badge 
+                              key={student.id} 
+                              variant={selectedStudent?.id === student.id ? "default" : "outline"}
+                              className={selectedStudent?.id === student.id ? "bg-purple-600" : ""}
+                            >
+                              {student.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardHeader>
