@@ -29,6 +29,7 @@ export default function ScanPage() {
   const [errorShown, setErrorShown] = useState(false);
   const [enrollmentMessage, setEnrollmentMessage] = useState("");
   const [enrollmentMessageType, setEnrollmentMessageType] = useState<"success" | "error" | "">("");
+  const [scanErrorMessage, setScanErrorMessage] = useState("");
 
   useEffect(() => {
     const userData = localStorage.getItem("user")
@@ -133,6 +134,11 @@ export default function ScanPage() {
       }
       
       // Show success message
+      console.log('Scan response:', data);
+      console.log('Success:', data.success);
+      console.log('Type:', data.type);
+      console.log('Message:', data.message);
+      
       if (data.success) {
         setScanSuccess(true);
         setSuccessMessage(data.message);
@@ -142,11 +148,32 @@ export default function ScanPage() {
           window.location.reload()
         }, 3000)
       } else {
-        // Clear processed codes after a delay to allow for new scans
-        setTimeout(() => {
-          setProcessedCodes(new Set())
-          setErrorShown(false) // Reset error state
-        }, 3000)
+        // Handle enrollment errors as text labels
+        if (data.type === 'enrollment') {
+          console.log('Setting enrollment error message from scan:', data.message);
+          setEnrollmentMessage(data.message);
+          setEnrollmentMessageType("error");
+          
+          // Clear message after 4 seconds
+          setTimeout(() => {
+            setEnrollmentMessage("");
+            setEnrollmentMessageType("");
+          }, 4000)
+        } else {
+          // For other errors, show error message
+          setScanErrorMessage(data.message);
+          
+          // Clear message after 4 seconds
+          setTimeout(() => {
+            setScanErrorMessage("");
+          }, 4000)
+          
+          // Clear processed codes after a delay to allow for new scans
+          setTimeout(() => {
+            setProcessedCodes(new Set())
+            setErrorShown(false) // Reset error state
+          }, 3000)
+        }
       }
       
     } catch (error: any) {
@@ -420,7 +447,7 @@ export default function ScanPage() {
             <CardContent className="space-y-4">
               {/* Success message display */}
               {scanSuccess && (
-                <Alert className="border-blue-200 bg-blue-50">
+                <Alert className="border-green-200 bg-green-50">
                   <CheckCircle className="h-4 w-4 text-green-600" />
                   <AlertDescription className="text-green-800">
                     {successMessage}
@@ -428,9 +455,19 @@ export default function ScanPage() {
                 </Alert>
               )}
               
+              {/* Scan error message display */}
+              {scanErrorMessage && (
+                <Alert className="border-red-200 bg-red-50">
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                  <AlertDescription className="text-red-800">
+                    {scanErrorMessage}
+                  </AlertDescription>
+                </Alert>
+              )}
+              
               {/* Enrollment message display */}
               {enrollmentMessage && (
-                <Alert className={enrollmentMessageType === "success" ? "border-blue-200 bg-green-50" : "border-red-200 bg-red-50"}>
+                <Alert className={enrollmentMessageType === "success" ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
                   {enrollmentMessageType === "success" ? (
                     <CheckCircle className="h-4 w-4 text-green-600" />
                   ) : (
