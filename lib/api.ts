@@ -54,6 +54,10 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+    generatePendingCodes: (data: { sessionId: string, type: 'in' | 'out' }) => apiClient.request('/auth?route=generate-pending-codes', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
     submitManualCode: (data: { code: string, studentId: string }) => apiClient.request('/auth?route=manual-code', {
       method: 'POST',
       body: JSON.stringify(data),

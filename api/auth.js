@@ -1170,6 +1170,62 @@ export default async function handler(req, res) {
     }
   }
 
+  // Generate list of manual codes for pending students (teacher)
+  if (route === 'generate-pending-codes' && req.method === 'POST') {
+    const { sessionId, type } = req.body;
+    if (!sessionId || !['in', 'out'].includes(type)) {
+      return res.status(400).json({ error: 'Missing or invalid sessionId/type' });
+    }
+    try {
+      // Get all pending students for this session
+      const pendingStudents = await pool.query(`
+        SELECT 
+          ar.student_id,
+          u.name as student_name,
+          u.student_id as student_number
+        FROM attendance_records ar
+        JOIN users u ON ar.student_id = u.id
+        WHERE ar.session_id = $1 AND ar.status = 'pending'
+        ORDER BY u.name
+      `, [sessionId]);
+      
+      if (pendingStudents.rows.length === 0) {
+        return res.json({ 
+          message: 'No pending students found for this session',
+          codes: []
+        });
+      }
+      
+      const codes = [];
+      
+      // Generate a code for each pending student
+      for (const student of pendingStudents.rows) {
+        const code = crypto.randomBytes(4).toString('hex').slice(0, 6).toUpperCase();
+        
+        // Store in DB
+        await pool.query(
+          'INSERT INTO manual_attendance_codes (session_id, type, code) VALUES ($1, $2, $3)',
+          [sessionId, type, code]
+        );
+        
+        codes.push({
+          code,
+          studentName: student.student_name,
+          studentNumber: student.student_number,
+          studentId: student.student_id
+        });
+      }
+      
+      return res.json({ 
+        message: `Generated ${codes.length} codes for pending students`,
+        codes,
+        totalPending: pendingStudents.rows.length
+      });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to generate pending codes', details: err.message });
+    }
+  }
+
   // Student submits manual code
   if (route === 'manual-code' && req.method === 'POST') {
     const { code, studentId } = req.body;

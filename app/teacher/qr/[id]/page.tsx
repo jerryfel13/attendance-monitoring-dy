@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useToast } from "@/hooks/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ArrowLeft, QrCode, Download, RefreshCw, Copy, CheckCircle, ZoomIn, X } from "lucide-react"
 import Link from "next/link"
@@ -15,6 +16,7 @@ import QRCode from 'react-qr-code'
 import { apiClient } from "@/lib/api"
 
 export default function QRManagementPage({ params }: { params: Promise<{ id: string }> }) {
+  const { toast } = useToast();
   const [id, setId] = useState<string>("");
   const [subject, setSubject] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -28,6 +30,8 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
   const [manualOutCode, setManualOutCode] = useState<string>("");
   const [manualInLoading, setManualInLoading] = useState(false);
   const [manualOutLoading, setManualOutLoading] = useState(false);
+  const [pendingCodes, setPendingCodes] = useState<any[]>([]);
+  const [pendingCodesLoading, setPendingCodesLoading] = useState(false);
   const [qrPreviewOpen, setQrPreviewOpen] = useState(false);
   const [previewQrData, setPreviewQrData] = useState("");
   const [previewQrTitle, setPreviewQrTitle] = useState("");
@@ -161,6 +165,32 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
     } finally {
       setManualOutLoading(false);
     }
+  };
+
+  const generatePendingCodes = async (type: 'in' | 'out') => {
+    if (!sessionId) return;
+    setPendingCodesLoading(true);
+    try {
+      const data = await apiClient.auth.generatePendingCodes({ sessionId: String(sessionId), type });
+      setPendingCodes(data.codes || []);
+      toast({
+        title: "Success",
+        description: data.message,
+        variant: "default"
+      });
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to generate pending codes",
+        variant: "destructive"
+      });
+    } finally {
+      setPendingCodesLoading(false);
+    }
+  };
+
+  const clearPendingCodes = () => {
+    setPendingCodes([]);
   };
 
   const openQrPreview = (qrData: string, title: string) => {
@@ -464,6 +494,35 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                         <span className="ml-2 text-xs text-gray-500">Give this code to the student for manual attendance in</span>
                       </div>
                     )}
+                    
+                    <div className="mt-4 pt-4 border-t">
+                      <Button 
+                        onClick={() => generatePendingCodes('in')} 
+                        disabled={pendingCodesLoading || !sessionActive} 
+                        variant="outline"
+                        className="w-full mb-2"
+                      >
+                        {pendingCodesLoading ? 'Generating...' : 'Generate Codes for Pending Students (In)'}
+                      </Button>
+                      {pendingCodes.length > 0 && (
+                        <div className="mt-4">
+                          <h4 className="font-medium mb-2">Pending Student Codes:</h4>
+                          <div className="space-y-2 max-h-40 overflow-y-auto">
+                            {pendingCodes.map((codeData, index) => (
+                              <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                                <div className="flex-1">
+                                  <div className="font-medium text-sm">{codeData.studentName}</div>
+                                  <div className="text-xs text-gray-500">ID: {codeData.studentNumber}</div>
+                                </div>
+                                <span className="font-mono text-lg bg-white px-3 py-1 rounded border">
+                                  {codeData.code}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -542,6 +601,35 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                         <span className="ml-2 text-xs text-gray-500">Give this code to the student for manual attendance out</span>
                       </div>
                     )}
+                    
+                    <div className="mt-4 pt-4 border-t">
+                      <Button 
+                        onClick={() => generatePendingCodes('out')} 
+                        disabled={pendingCodesLoading || !sessionActive} 
+                        variant="outline"
+                        className="w-full mb-2"
+                      >
+                        {pendingCodesLoading ? 'Generating...' : 'Generate Codes for Pending Students (Out)'}
+                      </Button>
+                      {pendingCodes.length > 0 && (
+                        <div className="mt-4">
+                          <h4 className="font-medium mb-2">Pending Student Codes:</h4>
+                          <div className="space-y-2 max-h-40 overflow-y-auto">
+                            {pendingCodes.map((codeData, index) => (
+                              <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                                <div className="flex-1">
+                                  <div className="font-medium text-sm">{codeData.studentName}</div>
+                                  <div className="text-xs text-gray-500">ID: {codeData.studentNumber}</div>
+                                </div>
+                                <span className="font-mono text-lg bg-white px-3 py-1 rounded border">
+                                  {codeData.code}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
