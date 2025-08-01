@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Camera, QrCode, ArrowLeft, CheckCircle, X } from "lucide-react"
+import { Camera, QrCode, ArrowLeft, CheckCircle, X, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { Html5QrcodeScanner } from "html5-qrcode"
 import { apiClient } from "@/lib/api"
@@ -28,6 +28,8 @@ export default function ScanPage() {
   const [scanSuccess, setScanSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorShown, setErrorShown] = useState(false);
+  const [enrollmentMessage, setEnrollmentMessage] = useState("");
+  const [enrollmentMessageType, setEnrollmentMessageType] = useState<"success" | "error" | "">("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -324,33 +326,31 @@ export default function ScanPage() {
         // Add to processed codes to prevent duplicates
         setProcessedCodes(prev => new Set([...prev, manualCode.trim()]))
         
-        // Show success message and keep toast visible longer
+        // Show enrollment message as text label instead of toast
         if (data.success) {
-          setScanSuccess(true);
-          setSuccessMessage(data.message);
+          setEnrollmentMessage(data.message);
+          setEnrollmentMessageType("success");
           
-          toast({
-            title: "Success",
-            description: data.message,
-            variant: "default",
-            duration: 5000 // Show toast for 5 seconds
-          });
+          // Clear message after 5 seconds
+          setTimeout(() => {
+            setEnrollmentMessage("");
+            setEnrollmentMessageType("");
+          }, 5000)
           
           // Refresh after a longer delay to let user see the success
           setTimeout(() => {
             window.location.reload()
           }, 3000)
         } else {
-          // Only show error toast once
-          if (!errorShown) {
-            setErrorShown(true);
-            toast({
-              title: "Error",
-              description: data.message,
-              variant: "destructive",
-              duration: 4000 // Show error toast for 4 seconds
-            });
-          }
+          // Show error message as text label
+          setEnrollmentMessage(data.message);
+          setEnrollmentMessageType("error");
+          
+          // Clear message after 4 seconds
+          setTimeout(() => {
+            setEnrollmentMessage("");
+            setEnrollmentMessageType("");
+          }, 4000)
           
           // Clear processed codes after a delay to allow for new scans
           setTimeout(() => {
@@ -505,6 +505,20 @@ export default function ScanPage() {
                   <CheckCircle className="h-4 w-4 text-green-600" />
                   <AlertDescription className="text-green-800">
                     {successMessage}
+                  </AlertDescription>
+                </Alert>
+              )}
+              
+              {/* Enrollment message display */}
+              {enrollmentMessage && (
+                <Alert className={enrollmentMessageType === "success" ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
+                  {enrollmentMessageType === "success" ? (
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 text-red-600" />
+                  )}
+                  <AlertDescription className={enrollmentMessageType === "success" ? "text-green-800" : "text-red-800"}>
+                    {enrollmentMessage}
                   </AlertDescription>
                 </Alert>
               )}
