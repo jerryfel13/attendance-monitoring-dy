@@ -77,32 +77,32 @@ export const apiClient = {
     }),
   },
   teacher: {
-    getSubjects: (teacherId: string) => apiClient.request(`/subjects?route=teacher-subjects&teacherId=${teacherId}`),
-    createSubject: (data: any) => apiClient.request('/subjects?route=create', {
+    getSubjects: (teacherId: string) => apiClient.request(`/api/subjects/teacher-subjects?teacherId=${teacherId}`),
+    createSubject: (data: any) => apiClient.request('/api/subjects/create', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-    getSubject: (id: string) => apiClient.request(`/subjects?route=get&id=${id}`),
-    getSubjectStudents: (id: string) => apiClient.request(`/subjects?route=students&id=${id}`),
-    getSubjectSessions: (id: string) => apiClient.request(`/subjects?route=sessions&id=${id}`),
-    startSession: (id: string, data: any) => apiClient.request(`/subjects?route=create-session&id=${id}`, {
+    getSubject: (id: string) => apiClient.request(`/api/subjects/get?id=${id}`),
+    getSubjectStudents: (id: string) => apiClient.request(`/api/subjects/students?id=${id}`),
+    getSubjectSessions: (id: string) => apiClient.request(`/api/subjects/sessions?id=${id}`),
+    startSession: (id: string, data: any) => apiClient.request(`/api/subjects/create-session?id=${id}`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-    stopSession: (sessionId: string) => apiClient.request(`/sessions?route=stop&id=${sessionId}`, {
+    stopSession: (sessionId: string) => apiClient.request(`/api/sessions/stop?id=${sessionId}`, {
       method: 'PUT',
     }),
-    getActiveSession: (id: string) => apiClient.request(`/subjects?route=active-session&id=${id}`),
-    deleteSubject: (id: string) => apiClient.request(`/subjects?route=delete&id=${id}`, {
+    getActiveSession: (id: string) => apiClient.request(`/api/subjects/active-session?id=${id}`),
+    deleteSubject: (id: string) => apiClient.request(`/api/subjects/delete?id=${id}`, {
       method: 'DELETE',
     }),
-    updateSubject: (id: string, data: any) => apiClient.request(`/subjects?route=update&id=${id}`, {
+    updateSubject: (id: string, data: any) => apiClient.request(`/api/subjects/update?id=${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
   },
   student: {
-    getSubjects: (studentId: string) => apiClient.request(`/subjects?route=student-subjects&studentId=${studentId}`),
+    getSubjects: (studentId: string) => apiClient.request(`/api/subjects/student-subjects?studentId=${studentId}`),
   },
   records: {
     getEnrollments: () => apiClient.request('/records?route=enrollments'),

@@ -564,6 +564,9 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                       <div className="text-xs text-gray-500 mt-1 mb-2">
                         Note: All generated codes will be automatically cleared when the session is stopped.
                       </div>
+                      <div className="text-xs text-blue-600 mt-1 mb-2 bg-blue-50 p-2 rounded">
+                        💡 <strong>Purpose:</strong> These codes are for students who can't scan QR codes or don't have devices to scan. They can manually enter these codes on the student scan page.
+                      </div>
                       
                       {pendingCodes.length > 0 && (
                         <div className="mt-4">
@@ -723,6 +726,9 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
                         Note: All generated codes will be automatically cleared when the session is stopped.
+                      </div>
+                      <div className="text-xs text-blue-600 mt-1 mb-2 bg-blue-50 p-2 rounded">
+                        💡 <strong>Purpose:</strong> These codes are for students who can't scan QR codes or don't have devices to scan. They can manually enter these codes on the student scan page.
                       </div>
                       {pendingCodes.length > 0 && (
                         <div className="mt-4">
