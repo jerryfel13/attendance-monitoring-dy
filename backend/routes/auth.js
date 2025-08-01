@@ -875,12 +875,12 @@ router.post('/scan', async (req, res) => {
             success: false 
           });
         } else {
-          return res.status(409).json({ 
-            type: 'attendance',
+        return res.status(409).json({ 
+          type: 'attendance',
             message: 'Attendance already finalized for this session',
-            success: false 
-          });
-        }
+          success: false 
+        });
+      }
       }
       
       // Calculate late status immediately upon check-in

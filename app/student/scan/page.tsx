@@ -12,7 +12,6 @@ import { Camera, QrCode, ArrowLeft, CheckCircle, X, AlertCircle } from "lucide-r
 import Link from "next/link"
 import { Html5QrcodeScanner } from "html5-qrcode"
 import { apiClient } from "@/lib/api"
-import { useToast } from "@/hooks/use-toast";
 
 export default function ScanPage() {
   const [qrCode, setQrCode] = useState("")
@@ -30,7 +29,6 @@ export default function ScanPage() {
   const [errorShown, setErrorShown] = useState(false);
   const [enrollmentMessage, setEnrollmentMessage] = useState("");
   const [enrollmentMessageType, setEnrollmentMessageType] = useState<"success" | "error" | "">("");
-  const { toast } = useToast();
 
   useEffect(() => {
     const userData = localStorage.getItem("user")
@@ -68,11 +66,6 @@ export default function ScanPage() {
       scannerRef.current.render(onScanSuccess, onScanFailure)
     } catch (error) {
       console.error("Failed to start camera:", error)
-      toast({
-        title: "Error",
-        description: "Failed to access camera. Please check permissions.",
-        variant: "destructive"
-      });
       setIsCameraActive(false)
     }
   }
@@ -113,11 +106,6 @@ export default function ScanPage() {
     
     // Check if code was already processed
     if (processedCodes.has(dataToProcess.trim())) {
-      toast({
-        title: "Already Processed",
-        description: "This code has already been processed.",
-        variant: "destructive"
-      });
       return;
     }
 
@@ -144,34 +132,16 @@ export default function ScanPage() {
         stopCamera()
       }
       
-      // Show success message and keep toast visible longer
+      // Show success message
       if (data.success) {
         setScanSuccess(true);
         setSuccessMessage(data.message);
-        
-        toast({
-          title: "Success",
-          description: data.message,
-          variant: "default",
-          duration: 5000 // Show toast for 5 seconds
-        });
         
         // Refresh after a longer delay to let user see the success
         setTimeout(() => {
           window.location.reload()
         }, 3000)
       } else {
-        // Only show error toast once
-        if (!errorShown) {
-          setErrorShown(true);
-          toast({
-            title: "Error",
-            description: data.message,
-            variant: "destructive",
-            duration: 4000 // Show error toast for 4 seconds
-          });
-        }
-        
         // Clear processed codes after a delay to allow for new scans
         setTimeout(() => {
           setProcessedCodes(new Set())
@@ -197,40 +167,7 @@ export default function ScanPage() {
         setErrorShown(false) // Reset error state
       }, 3000)
       
-      // Only show error toast once
-      if (!errorShown) {
-        setErrorShown(true);
-        
-        // Handle specific error types with user-friendly messages
-        let errorMessage = "Failed to process QR code. Please try again."
-        
-        if (error.response?.status === 409) {
-          if (error.response?.data?.type === 'enrollment') {
-            errorMessage = "You are already enrolled in this subject."
-                  } else if (error.response?.data?.type === 'attendance') {
-          errorMessage = "Already scanned for this session. Please scan out at the end of class."
-        } else {
-            errorMessage = "This QR code has already been used."
-          }
-        } else if (error.response?.status === 403) {
-          errorMessage = "You are not enrolled in this subject. Please enroll first."
-        } else if (error.response?.status === 404) {
-          if (error.response?.data?.type === 'attendance') {
-            errorMessage = "No active attendance session found. Please wait for the teacher to start the session."
-          } else {
-            errorMessage = "Subject not found. Please check the QR code."
-          }
-        } else if (error.response?.status === 400) {
-          errorMessage = "Invalid QR code format. Please scan a valid QR code."
-        }
-        
-        // toast({
-        //   title: "Error",
-        //   description: errorMessage,
-        //   variant: "destructive",
-        //   duration: 4000 // Show error toast for 4 seconds
-        // });
-      }
+
     } finally {
       setIsScanning(false)
     }
@@ -298,11 +235,6 @@ export default function ScanPage() {
     
     // Check if code was already processed
     if (processedCodes.has(manualCode.trim())) {
-      toast({
-        title: "Already Processed",
-        description: "This code has already been processed.",
-        variant: "destructive"
-      });
       return;
     }
     
@@ -371,34 +303,16 @@ export default function ScanPage() {
         // Add to processed codes to prevent duplicates
         setProcessedCodes(prev => new Set([...prev, manualCode.trim()]))
         
-        // Show success message and keep toast visible longer
+        // Show success message
         if (data.success) {
           setScanSuccess(true);
           setSuccessMessage(data.message);
-          
-          toast({
-            title: "Success",
-            description: data.message,
-            variant: "default",
-            duration: 5000 // Show toast for 5 seconds
-          });
           
           // Refresh after a longer delay to let user see the success
           setTimeout(() => {
             window.location.reload()
           }, 3000)
         } else {
-          // Only show error toast once
-          if (!errorShown) {
-            setErrorShown(true);
-            toast({
-              title: "Error",
-              description: data.message,
-              variant: "destructive",
-              duration: 4000 // Show error toast for 4 seconds
-            });
-          }
-          
           // Clear processed codes after a delay to allow for new scans
           setTimeout(() => {
             setProcessedCodes(new Set())
@@ -419,16 +333,21 @@ export default function ScanPage() {
         setErrorShown(false) // Reset error state
       }, 3000)
       
-      // Only show error toast once
-      if (!errorShown) {
-        setErrorShown(true);
-        
-        // Handle specific error types with user-friendly messages
-        let errorMessage = "Failed to process manual code. Please try again."
+      // Handle specific error types with user-friendly messages
+      let errorMessage = "Failed to process manual code. Please try again."
       
       if (error.response?.status === 409) {
         if (error.response?.data?.type === 'enrollment') {
-          errorMessage = "You are already enrolled in this subject."
+          errorMessage = error.response.data.message || "You are already enrolled in this subject."
+          // Show enrollment error as text label
+          setEnrollmentMessage(errorMessage);
+          setEnrollmentMessageType("error");
+          
+          // Clear message after 4 seconds
+          setTimeout(() => {
+            setEnrollmentMessage("");
+            setEnrollmentMessageType("");
+          }, 4000)
         } else if (error.response?.data?.type === 'attendance') {
           errorMessage = "Already scanned for this session. Please scan out at the end of class."
         } else {
@@ -444,14 +363,9 @@ export default function ScanPage() {
         }
       } else if (error.response?.status === 400) {
         errorMessage = "Invalid code format. Please enter a valid code."
-      }
-      
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-        duration: 4000 // Show error toast for 4 seconds
-      });
+      } else {
+        // Generic error
+        errorMessage = "Failed to process manual code. Please try again."
       }
     } finally {
       setManualSubmitting(false);

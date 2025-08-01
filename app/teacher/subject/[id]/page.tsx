@@ -290,8 +290,8 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
       </footer>
-    </div>
-  )
+      </div>
+    )
 
   if (loading) return <SubjectDetailsSkeleton />
 
@@ -615,10 +615,10 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
                     </Button>
                   </Link>
                   <Link href={`/teacher/qr/${subject.id}`} className="w-full">
-                    <Button variant="outline" className="w-full">
-                      <Calendar className="w-4 h-4 mr-2" />
-                      Create Session
-                    </Button>
+                  <Button variant="outline" className="w-full">
+                    <Calendar className="w-4 h-4 mr-2" />
+                    Create Session
+                  </Button>
                   </Link>
                 </CardContent>
               </Card>
