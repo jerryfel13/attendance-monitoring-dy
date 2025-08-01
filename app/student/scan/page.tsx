@@ -420,7 +420,7 @@ export default function ScanPage() {
             <CardContent className="space-y-4">
               {/* Success message display */}
               {scanSuccess && (
-                <Alert className="border-green-200 bg-green-50">
+                <Alert className="border-blue-200 bg-blue-50">
                   <CheckCircle className="h-4 w-4 text-green-600" />
                   <AlertDescription className="text-green-800">
                     {successMessage}
