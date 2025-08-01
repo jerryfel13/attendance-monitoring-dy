@@ -430,7 +430,7 @@ export default function ScanPage() {
               
               {/* Enrollment message display */}
               {enrollmentMessage && (
-                <Alert className={enrollmentMessageType === "success" ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
+                <Alert className={enrollmentMessageType === "success" ? "border-blue-200 bg-green-50" : "border-red-200 bg-red-50"}>
                   {enrollmentMessageType === "success" ? (
                     <CheckCircle className="h-4 w-4 text-green-600" />
                   ) : (
