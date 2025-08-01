@@ -60,6 +60,7 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
   const [isSpinning, setIsSpinning] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [pendingStudents, setPendingStudents] = useState<any[]>([]);
+  const [activeSession, setActiveSession] = useState<any>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -98,6 +99,19 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
         setSessions(data.sessions || [])
       })
       .catch(() => setSessions([]))
+
+    // Get active session for this subject
+    apiClient.teacher.getActiveSession(id)
+      .then(data => {
+        if (data.session) {
+          setActiveSession(data.session);
+          setSelectedSessionId(String(data.session.id));
+        }
+      })
+      .catch(() => {
+        setActiveSession(null);
+        setSelectedSessionId("");
+      })
   }, [id, router])
 
   useEffect(() => {
@@ -688,25 +702,27 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
                       <h3 className="text-lg font-semibold text-purple-900 mb-2">🎯 Recitation Spin Wheel</h3>
                       <p className="text-sm text-gray-600 mb-4">Randomly select a pending student for recitation</p>
                       
-                      {/* Session Selection */}
+                      {/* Active Session Display */}
                       <div className="mb-4">
-                        <Label className="text-sm font-medium">Select Active Session:</Label>
-                        <select
-                          className="w-full mt-1 border rounded px-3 py-2 text-sm"
-                          value={selectedSessionId}
-                          onChange={e => setSelectedSessionId(e.target.value)}
-                        >
-                          <option value="">-- Select Session --</option>
-                          {sessions.map((session) => (
-                            <option key={session.id} value={session.id}>
-                              {new Date(session.session_date).toLocaleDateString()} {session.session_time}
-                            </option>
-                          ))}
-                        </select>
+                        {activeSession ? (
+                          <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                            <div className="text-sm font-medium text-green-900 mb-1">Active Session:</div>
+                            <div className="text-sm text-green-800">
+                              {new Date(activeSession.session_date).toLocaleDateString()} at {activeSession.session_time}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <div className="text-sm font-medium text-gray-900 mb-1">No Active Session</div>
+                            <div className="text-sm text-gray-600">
+                              Start a session in QR Management to enable recitation
+                            </div>
+                          </div>
+                        )}
                       </div>
                       
-                      {/* Spin Wheel */}
-                      {selectedSessionId && (
+                                             {/* Spin Wheel */}
+                       {activeSession && (
                         <div className="space-y-4">
                           <div className="flex items-center justify-center">
                             <div className="relative">
@@ -766,9 +782,9 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
                         </div>
                       )}
                       
-                      {!selectedSessionId && (
+                      {!activeSession && (
                         <div className="text-center text-gray-500 text-sm">
-                          Select a session above to enable the spin wheel
+                          No active session. Start a session in QR Management to enable recitation.
                         </div>
                       )}
                     </div>
