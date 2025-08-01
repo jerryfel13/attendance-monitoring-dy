@@ -875,7 +875,7 @@ router.post('/scan', async (req, res) => {
             success: false 
           });
         } else {
-        return res.status(409).json({ 
+          return res.status(409).json({ 
           type: 'attendance',
             message: 'Attendance already finalized for this session',
           success: false 

@@ -259,6 +259,10 @@ export default function ScanPage() {
         setProcessedCodes(prev => new Set([...prev, manualCode.trim()]))
         
         // Show enrollment message as text label instead of toast
+        console.log('Enrollment response:', data);
+        console.log('Success:', data.success);
+        console.log('Message:', data.message);
+        
         if (data.success) {
           setEnrollmentMessage(data.message);
           setEnrollmentMessageType("success");
@@ -274,6 +278,7 @@ export default function ScanPage() {
             window.location.reload()
           }, 3000)
         } else {
+          console.log('Setting enrollment error message:', data.message);
           // Show error message as text label
           setEnrollmentMessage(data.message);
           setEnrollmentMessageType("error");
@@ -435,6 +440,13 @@ export default function ScanPage() {
                     {enrollmentMessage}
                   </AlertDescription>
                 </Alert>
+              )}
+              
+              {/* Debug info */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="text-xs text-gray-500 p-2 bg-gray-100 rounded">
+                  Debug: enrollmentMessage="{enrollmentMessage}", type="{enrollmentMessageType}"
+                </div>
               )}
               
               {/* Always render the qr-reader div, but only show it when camera is active */}
