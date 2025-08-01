@@ -193,6 +193,11 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
     setPendingCodes([]);
   };
 
+  // Clear codes when switching tabs
+  useEffect(() => {
+    clearPendingCodes();
+  }, []);
+
   const openQrPreview = (qrData: string, title: string) => {
     setPreviewQrData(qrData);
     setPreviewQrTitle(title);
@@ -502,11 +507,11 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                         variant="outline"
                         className="w-full mb-2"
                       >
-                        {pendingCodesLoading ? 'Generating...' : 'Generate Codes for Pending Students (In)'}
+                        {pendingCodesLoading ? 'Generating...' : 'Generate Codes for All Enrolled Students (In)'}
                       </Button>
                       {pendingCodes.length > 0 && (
                         <div className="mt-4">
-                          <h4 className="font-medium mb-2">Pending Student Codes:</h4>
+                          <h4 className="font-medium mb-2">Student Codes:</h4>
                           <div className="space-y-2 max-h-40 overflow-y-auto">
                             {pendingCodes.map((codeData, index) => (
                               <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">

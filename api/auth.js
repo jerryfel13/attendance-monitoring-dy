@@ -1170,36 +1170,71 @@ export default async function handler(req, res) {
     }
   }
 
-  // Generate list of manual codes for pending students (teacher)
+  // Generate list of manual codes for students (teacher)
   if (route === 'generate-pending-codes' && req.method === 'POST') {
     const { sessionId, type } = req.body;
     if (!sessionId || !['in', 'out'].includes(type)) {
       return res.status(400).json({ error: 'Missing or invalid sessionId/type' });
     }
     try {
-      // Get all pending students for this session
-      const pendingStudents = await pool.query(`
-        SELECT 
-          ar.student_id,
-          u.name as student_name,
-          u.student_id as student_number
-        FROM attendance_records ar
-        JOIN users u ON ar.student_id = u.id
-        WHERE ar.session_id = $1 AND ar.status = 'pending'
-        ORDER BY u.name
-      `, [sessionId]);
+      let students;
+      let message;
       
-      if (pendingStudents.rows.length === 0) {
+      if (type === 'in') {
+        // For attendance-in: Get all enrolled students for this subject
+        const sessionInfo = await pool.query(
+          'SELECT subject_id FROM attendance_sessions WHERE id = $1',
+          [sessionId]
+        );
+        
+        if (sessionInfo.rows.length === 0) {
+          return res.status(404).json({ error: 'Session not found' });
+        }
+        
+        const subjectId = sessionInfo.rows[0].subject_id;
+        
+        students = await pool.query(`
+          SELECT 
+            u.id as student_id,
+            u.name as student_name,
+            u.student_id as student_number
+          FROM users u
+          JOIN enrollments e ON u.id = e.student_id
+          WHERE e.subject_id = $1 AND u.role = 'student'
+          ORDER BY u.name
+        `, [subjectId]);
+        
+        message = `Generated ${students.rows.length} codes for all enrolled students`;
+      } else {
+        // For attendance-out: Get only pending students
+        students = await pool.query(`
+          SELECT 
+            ar.student_id,
+            u.name as student_name,
+            u.student_id as student_number
+          FROM attendance_records ar
+          JOIN users u ON ar.student_id = u.id
+          WHERE ar.session_id = $1 AND ar.status = 'pending'
+          ORDER BY u.name
+        `, [sessionId]);
+        
+        message = `Generated ${students.rows.length} codes for pending students`;
+      }
+      
+      if (students.rows.length === 0) {
+        const noStudentsMessage = type === 'in' 
+          ? 'No enrolled students found for this subject'
+          : 'No pending students found for this session';
         return res.json({ 
-          message: 'No pending students found for this session',
+          message: noStudentsMessage,
           codes: []
         });
       }
       
       const codes = [];
       
-      // Generate a code for each pending student
-      for (const student of pendingStudents.rows) {
+      // Generate a code for each student
+      for (const student of students.rows) {
         const code = crypto.randomBytes(4).toString('hex').slice(0, 6).toUpperCase();
         
         // Store in DB
@@ -1217,12 +1252,12 @@ export default async function handler(req, res) {
       }
       
       return res.json({ 
-        message: `Generated ${codes.length} codes for pending students`,
+        message,
         codes,
-        totalPending: pendingStudents.rows.length
+        totalStudents: students.rows.length
       });
     } catch (err) {
-      return res.status(500).json({ error: 'Failed to generate pending codes', details: err.message });
+      return res.status(500).json({ error: 'Failed to generate codes', details: err.message });
     }
   }
 
