@@ -222,12 +222,12 @@ export default function ScanPage() {
           errorMessage = "Invalid QR code format. Please scan a valid QR code."
         }
         
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-          duration: 4000 // Show error toast for 4 seconds
-        });
+        // toast({
+        //   title: "Error",
+        //   description: errorMessage,
+        //   variant: "destructive",
+        //   duration: 4000 // Show error toast for 4 seconds
+        // });
       }
     } finally {
       setIsScanning(false)
