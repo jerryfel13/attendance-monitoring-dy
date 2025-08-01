@@ -136,6 +136,18 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
         setSessionActive(false)
         setSessionId(null)
         console.log('Attendance session stopped successfully')
+        
+        // Clear all generated codes for this session
+        try {
+          await apiClient.auth.clearSessionCodes(String(sessionId))
+          console.log('Session codes cleared successfully')
+          // Clear local state
+          setPendingCodes([])
+          setSearchStudent("")
+          setSearchedCode(null)
+        } catch (clearError) {
+          console.error('Error clearing session codes:', clearError)
+        }
       } else {
         console.error('Failed to stop attendance session')
       }
@@ -196,6 +208,27 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
 
   const clearPendingCodes = () => {
     setPendingCodes([]);
+    setSearchStudent("");
+    setSearchedCode(null);
+  };
+
+  const clearSessionCodes = async () => {
+    if (!sessionId) return;
+    try {
+      await apiClient.auth.clearSessionCodes(String(sessionId));
+      clearPendingCodes();
+      toast({
+        title: "Success",
+        description: "All session codes cleared",
+        variant: "default"
+      });
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to clear session codes",
+        variant: "destructive"
+      });
+    }
   };
 
   const searchStudentCode = () => {
@@ -528,6 +561,9 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                       >
                         {pendingCodesLoading ? 'Generating...' : 'Generate Codes for All Enrolled Students (In)'}
                       </Button>
+                      <div className="text-xs text-gray-500 mt-1 mb-2">
+                        Note: All generated codes will be automatically cleared when the session is stopped.
+                      </div>
                       
                       {pendingCodes.length > 0 && (
                         <div className="mt-4">
@@ -579,6 +615,16 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                             </div>
                             <div className="text-sm text-gray-600">
                               • Search above to find specific student codes
+                            </div>
+                            <div className="mt-3">
+                              <Button 
+                                onClick={clearSessionCodes}
+                                variant="outline" 
+                                size="sm"
+                                className="text-red-600 border-red-200 hover:bg-red-50"
+                              >
+                                Clear All Codes
+                              </Button>
                             </div>
                           </div>
                         </div>
@@ -674,6 +720,9 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
                       </Button>
                       <div className="text-xs text-gray-500 mt-1">
                         Note: Attendance-out codes are visible for all pending students since they need to scan out.
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Note: All generated codes will be automatically cleared when the session is stopped.
                       </div>
                       {pendingCodes.length > 0 && (
                         <div className="mt-4">

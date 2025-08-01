@@ -1261,6 +1261,30 @@ export default async function handler(req, res) {
     }
   }
 
+  // Clear all generated codes for a session (when session is stopped)
+  if (route === 'clear-session-codes' && req.method === 'DELETE') {
+    const { sessionId } = req.body;
+    if (!sessionId) {
+      return res.status(400).json({ error: 'Missing sessionId' });
+    }
+    try {
+      // Delete all manual attendance codes for this session
+      const result = await pool.query(
+        'DELETE FROM manual_attendance_codes WHERE session_id = $1',
+        [sessionId]
+      );
+      
+      console.log(`Cleared ${result.rowCount} codes for session ${sessionId}`);
+      
+      return res.json({ 
+        message: `Cleared ${result.rowCount} codes for session`,
+        clearedCount: result.rowCount
+      });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to clear codes', details: err.message });
+    }
+  }
+
   // Student submits manual code
   if (route === 'manual-code' && req.method === 'POST') {
     const { code, studentId } = req.body;

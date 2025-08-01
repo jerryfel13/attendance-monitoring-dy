@@ -58,6 +58,10 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+    clearSessionCodes: (sessionId: string) => apiClient.request('/auth?route=clear-session-codes', {
+      method: 'DELETE',
+      body: JSON.stringify({ sessionId }),
+    }),
     submitManualCode: (data: { code: string, studentId: string }) => apiClient.request('/auth?route=manual-code', {
       method: 'POST',
       body: JSON.stringify(data),
