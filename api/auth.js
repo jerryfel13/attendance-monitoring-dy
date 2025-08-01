@@ -418,7 +418,7 @@ export default async function handler(req, res) {
             return res.json({
               type: 'attendance',
               message: 'Already scanned in for this session. Please scan out at the end of class.',
-              success: true
+              success: false
             });
           }
         }
@@ -530,12 +530,12 @@ export default async function handler(req, res) {
           });
         }
           
-          // If pending status, just return success (already scanned in)
+          // If pending status, just return error (already scanned in)
           if (existingRecord.status === 'pending') {
             return res.json({
               type: 'attendance',
               message: 'Already scanned in for this session. Please scan out at the end of class.',
-              success: true
+              success: false
             });
           }
         }
