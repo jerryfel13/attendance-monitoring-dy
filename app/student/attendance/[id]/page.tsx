@@ -18,6 +18,33 @@ export default function StudentAttendanceDetails({ params }: { params: { id: str
   const [selectedSession, setSelectedSession] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
+  // Function to format session date and time
+  const formatSessionDisplay = (session: any) => {
+    try {
+      const date = new Date(session.session_date);
+      const time = session.session_time;
+      
+      // Format date as "Mon DD, YYYY"
+      const formattedDate = date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+      
+      // Format time as "HH:MM AM/PM"
+      const formattedTime = time ? new Date(`2000-01-01T${time}`).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      }) : '';
+      
+      return `${formattedDate} ${formattedTime}`;
+    } catch (error) {
+      // Fallback to original format if parsing fails
+      return `${session.session_date} ${session.session_time}`;
+    }
+  };
+
   useEffect(() => {
     const userData = localStorage.getItem("user");
     if (!userData) {
@@ -49,6 +76,11 @@ export default function StudentAttendanceDetails({ params }: { params: { id: str
   const filteredAttendance = selectedSession && selectedSession !== "all"
     ? attendance.filter((a: any) => a.session_id === selectedSession)
     : attendance;
+
+  // Debug logging
+  console.log('Selected session:', selectedSession);
+  console.log('All attendance records:', attendance);
+  console.log('Filtered attendance records:', filteredAttendance);
 
   // Skeleton loading component
   const AttendanceSkeleton = () => (
@@ -124,7 +156,7 @@ export default function StudentAttendanceDetails({ params }: { params: { id: str
                 <SelectItem value="all">All Sessions</SelectItem>
                 {sessions.map((session: any) => (
                   <SelectItem key={session.id} value={session.id}>
-                    {session.session_date} {session.session_time}
+                    {formatSessionDisplay(session)}
                   </SelectItem>
                 ))}
               </SelectContent>
