@@ -161,8 +161,8 @@ export default async function handler(req, res) {
           ) as attendance_rate
         FROM users u
         JOIN enrollments e ON u.id = e.student_id
-        LEFT JOIN attendance_records ar ON u.id = ar.student_id
-        LEFT JOIN attendance_sessions s ON ar.session_id = s.id AND s.subject_id = $1
+        LEFT JOIN attendance_sessions s ON s.subject_id = $1
+        LEFT JOIN attendance_records ar ON ar.session_id = s.id AND ar.student_id = u.id
         WHERE e.subject_id = $1 AND u.role = 'student'
         GROUP BY u.id, u.name, u.email, u.student_id
         ORDER BY u.name
