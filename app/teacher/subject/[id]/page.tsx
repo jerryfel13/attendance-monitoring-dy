@@ -585,73 +585,6 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
                     <Button onClick={exportAttendanceToPDF} variant="outline">Export to PDF</Button>
                   </div>
                 )}
-                
-                {/* Spin Wheel for Recitation */}
-                {selectedSessionId && (
-                  <div className="mt-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-purple-900">🎯 Recitation Spin Wheel</h3>
-                        <p className="text-sm text-purple-700">Randomly select a pending student for recitation</p>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-medium text-purple-900">
-                          {pendingStudents.length} pending students
-                        </div>
-                        <div className="text-xs text-purple-600">Available for selection</div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-center mb-4">
-                      <div className="relative">
-                        <div className={`w-32 h-32 rounded-full border-4 border-purple-300 bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center transition-all duration-300 ${isSpinning ? 'animate-spin' : ''}`}>
-                          {selectedStudent ? (
-                            <div className="text-center">
-                              <div className="text-lg font-bold text-purple-900">{selectedStudent.name}</div>
-                              <div className="text-xs text-purple-600">{selectedStudent.student_id}</div>
-                            </div>
-                          ) : (
-                            <div className="text-center text-purple-600">
-                              <RotateCcw className="w-8 h-8 mx-auto mb-2" />
-                              <div className="text-sm">Click to spin</div>
-                            </div>
-                          )}
-                        </div>
-                        {isSpinning && (
-                          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-500 animate-spin"></div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-center">
-                      <Button 
-                        onClick={spinWheel}
-                        disabled={isSpinning || pendingStudents.length === 0}
-                        className="bg-purple-600 hover:bg-purple-700 text-white"
-                      >
-                        <RotateCcw className={`w-4 h-4 mr-2 ${isSpinning ? 'animate-spin' : ''}`} />
-                        {isSpinning ? 'Spinning...' : 'Spin for Recitation'}
-                      </Button>
-                    </div>
-                    
-                    {pendingStudents.length > 0 && (
-                      <div className="mt-4">
-                        <h4 className="text-sm font-medium text-purple-900 mb-2">Pending Students:</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {pendingStudents.map((student: any) => (
-                            <Badge 
-                              key={student.id} 
-                              variant={selectedStudent?.id === student.id ? "default" : "outline"}
-                              className={selectedStudent?.id === student.id ? "bg-purple-600" : ""}
-                            >
-                              {student.name}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
               </CardHeader>
               <CardContent>
                 {attendanceLoading ? (
@@ -748,6 +681,98 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
                     Create Session
                   </Button>
                   </Link>
+                  
+                  {/* Recitation Spin Wheel */}
+                  <div className="pt-4 border-t">
+                    <div className="text-center mb-4">
+                      <h3 className="text-lg font-semibold text-purple-900 mb-2">🎯 Recitation Spin Wheel</h3>
+                      <p className="text-sm text-gray-600 mb-4">Randomly select a pending student for recitation</p>
+                      
+                      {/* Session Selection */}
+                      <div className="mb-4">
+                        <Label className="text-sm font-medium">Select Active Session:</Label>
+                        <select
+                          className="w-full mt-1 border rounded px-3 py-2 text-sm"
+                          value={selectedSessionId}
+                          onChange={e => setSelectedSessionId(e.target.value)}
+                        >
+                          <option value="">-- Select Session --</option>
+                          {sessions.map((session) => (
+                            <option key={session.id} value={session.id}>
+                              {new Date(session.session_date).toLocaleDateString()} {session.session_time}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      {/* Spin Wheel */}
+                      {selectedSessionId && (
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-center">
+                            <div className="relative">
+                              <div className={`w-24 h-24 rounded-full border-4 border-purple-300 bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center transition-all duration-300 ${isSpinning ? 'animate-spin' : ''}`}>
+                                {selectedStudent ? (
+                                  <div className="text-center">
+                                    <div className="text-sm font-bold text-purple-900">{selectedStudent.name}</div>
+                                    <div className="text-xs text-purple-600">{selectedStudent.student_id}</div>
+                                  </div>
+                                ) : (
+                                  <div className="text-center text-purple-600">
+                                    <RotateCcw className="w-6 h-6 mx-auto mb-1" />
+                                    <div className="text-xs">Click to spin</div>
+                                  </div>
+                                )}
+                              </div>
+                              {isSpinning && (
+                                <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-500 animate-spin"></div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="text-center">
+                            <Button 
+                              onClick={spinWheel}
+                              disabled={isSpinning || pendingStudents.length === 0}
+                              className="bg-purple-600 hover:bg-purple-700 text-white"
+                              size="sm"
+                            >
+                              <RotateCcw className={`w-4 h-4 mr-2 ${isSpinning ? 'animate-spin' : ''}`} />
+                              {isSpinning ? 'Spinning...' : 'Spin for Recitation'}
+                            </Button>
+                          </div>
+                          
+                          <div className="text-center">
+                            <div className="text-sm font-medium text-purple-900">
+                              {pendingStudents.length} pending students available
+                            </div>
+                          </div>
+                          
+                          {pendingStudents.length > 0 && (
+                            <div className="mt-3">
+                              <h4 className="text-sm font-medium text-purple-900 mb-2 text-center">Pending Students:</h4>
+                              <div className="flex flex-wrap gap-1 justify-center">
+                                {pendingStudents.map((student: any) => (
+                                  <Badge 
+                                    key={student.id} 
+                                    variant={selectedStudent?.id === student.id ? "default" : "outline"}
+                                    className={selectedStudent?.id === student.id ? "bg-purple-600" : ""}
+                                  >
+                                    {student.name}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {!selectedSessionId && (
+                        <div className="text-center text-gray-500 text-sm">
+                          Select a session above to enable the spin wheel
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>
