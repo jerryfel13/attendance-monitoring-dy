@@ -225,20 +225,6 @@ export default function StudentDashboard() {
                     <p className="text-sm text-gray-600">Schedule: {subject.schedule}</p>
                   </div>
 
-                  {subject.enrolled && (
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Attendance Rate</span>
-                        <span>{subject.attendanceRate}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-blue-600 h-2 rounded-full"
-                          style={{ width: `${subject.attendanceRate}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  )}
 
                   <div className="flex space-x-2">
                     {subject.enrolled ? (
