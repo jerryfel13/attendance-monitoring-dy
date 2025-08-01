@@ -21,11 +21,17 @@ export const apiClient = {
     };
     try {
       const response = await fetch(url, config);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      const data = await response.json();
+      
+      // For 409 status codes, return the data instead of throwing
+      if (response.status === 409) {
+        return data;
       }
-      return await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
+      }
+      return data;
     } catch (error) {
       console.error('API Error:', error);
       throw error;
