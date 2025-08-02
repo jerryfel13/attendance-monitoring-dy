@@ -24,6 +24,7 @@ export default function ScanPage() {
   const [manualCode, setManualCode] = useState("");
   const [manualSubmitting, setManualSubmitting] = useState(false);
   const [processedCodes, setProcessedCodes] = useState<Set<string>>(new Set());
+  const [isProcessing, setIsProcessing] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorShown, setErrorShown] = useState(false);
@@ -87,7 +88,7 @@ export default function ScanPage() {
 
   const onScanSuccess = async (decodedText: string) => {
     // Prevent multiple rapid scans
-    if (isScanning) return
+    if (isScanning || isProcessing) return
     
     setQrCode(decodedText)
     await handleScan(decodedText)
@@ -103,14 +104,19 @@ export default function ScanPage() {
     if (!dataToProcess.trim()) return
 
     // Prevent multiple rapid scans
-    if (isScanning) return
+    if (isScanning || isProcessing) return
     
-    // Check if code was already processed
-    if (processedCodes.has(dataToProcess.trim())) {
+    // Create unique key for this scan attempt
+    const scanKey = `${dataToProcess.trim()}_${user?.id}`
+    
+    // Check if this exact scan was already processed
+    if (processedCodes.has(scanKey)) {
+      console.log('Duplicate scan prevented:', scanKey);
       return;
     }
 
     setIsScanning(true)
+    setIsProcessing(true)
     
     // Add a longer delay to prevent rapid successive scans and allow processing
     await new Promise(resolve => setTimeout(resolve, 1000))
@@ -126,7 +132,7 @@ export default function ScanPage() {
       setQrCode("")
       
       // Add to processed codes to prevent duplicates
-      setProcessedCodes(prev => new Set([...prev, dataToProcess.trim()]))
+      setProcessedCodes(prev => new Set([...prev, scanKey]))
       
       // Always close camera after scan attempt (success or error)
       if (isCameraActive) {
@@ -172,7 +178,8 @@ export default function ScanPage() {
           setTimeout(() => {
             setProcessedCodes(new Set())
             setErrorShown(false) // Reset error state
-          }, 3000)
+            setIsProcessing(false) // Reset processing state
+          }, 5000) // Increased delay to prevent rapid re-scans
         }
       }
       
@@ -181,7 +188,7 @@ export default function ScanPage() {
       setQrCode("")
       
       // Add to processed codes even on error to prevent retry spam
-      setProcessedCodes(prev => new Set([...prev, dataToProcess.trim()]))
+      setProcessedCodes(prev => new Set([...prev, scanKey]))
       
       // Always close camera after scan attempt (success or error)
       if (isCameraActive) {
@@ -192,11 +199,13 @@ export default function ScanPage() {
       setTimeout(() => {
         setProcessedCodes(new Set())
         setErrorShown(false) // Reset error state
-      }, 3000)
+        setIsProcessing(false) // Reset processing state
+      }, 5000) // Increased delay to prevent rapid re-scans
       
 
     } finally {
       setIsScanning(false)
+      setIsProcessing(false)
     }
   }
 
@@ -260,8 +269,12 @@ export default function ScanPage() {
     // Prevent multiple rapid submissions
     if (manualSubmitting) return;
     
-    // Check if code was already processed
-    if (processedCodes.has(manualCode.trim())) {
+    // Create unique key for this manual code submission
+    const manualCodeKey = `${manualCode.trim()}_${user?.id}`
+    
+    // Check if this exact manual code was already processed
+    if (processedCodes.has(manualCodeKey)) {
+      console.log('Duplicate manual code prevented:', manualCodeKey);
       return;
     }
     
@@ -333,7 +346,7 @@ export default function ScanPage() {
         setManualCode("");
         
         // Add to processed codes to prevent duplicates
-        setProcessedCodes(prev => new Set([...prev, manualCode.trim()]))
+        setProcessedCodes(prev => new Set([...prev, manualCodeKey]))
         
         // Show success message
         if (data.success) {
@@ -357,7 +370,7 @@ export default function ScanPage() {
       setManualCode("");
       
       // Add to processed codes even on error to prevent retry spam
-      setProcessedCodes(prev => new Set([...prev, manualCode.trim()]))
+      setProcessedCodes(prev => new Set([...prev, manualCodeKey]))
       
       // Clear processed codes after a delay to allow for new scans
       setTimeout(() => {
