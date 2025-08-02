@@ -108,21 +108,35 @@ export default async function handler(req, res) {
           return res.status(404).json({ error: 'Subject not found' });
         }
         const subjectId = subjectResult.rows[0].id;
-        const enrollmentCheck = await pool.query(
-          'SELECT id FROM enrollments WHERE student_id = $1 AND subject_id = $2',
-          [studentId, subjectId]
-        );
-        if (enrollmentCheck.rows.length > 0) {
-          return res.status(409).json({ 
-            type: 'enrollment',
-            message: `Already enrolled in ${subjectName} (${subjectCode})`,
-            success: false 
-          });
+        
+        // Use INSERT ... ON CONFLICT to prevent duplicates
+        try {
+          const result = await pool.query(
+            'INSERT INTO enrollments (student_id, subject_id) VALUES ($1, $2) ON CONFLICT (student_id, subject_id) DO NOTHING RETURNING id',
+            [studentId, subjectId]
+          );
+          
+          // If no rows were inserted, it means there was a conflict (duplicate)
+          if (result.rows.length === 0) {
+            return res.status(409).json({ 
+              type: 'enrollment',
+              message: `Already enrolled in ${subjectName} (${subjectCode})`,
+              success: false 
+            });
+          }
+        } catch (error) {
+          console.error('Error inserting enrollment record:', error);
+          // If there's a constraint violation, it means duplicate
+          if (error.code === '23505') {
+            return res.status(409).json({ 
+              type: 'enrollment',
+              message: `Already enrolled in ${subjectName} (${subjectCode})`,
+              success: false 
+            });
+          }
+          throw error;
         }
-        await pool.query(
-          'INSERT INTO enrollments (student_id, subject_id) VALUES ($1, $2)',
-          [studentId, subjectId]
-        );
+        
         return res.json({
           type: 'enrollment',
           message: `Successfully enrolled in ${subjectName} (${subjectCode})!`,
@@ -154,21 +168,35 @@ export default async function handler(req, res) {
           return res.status(404).json({ error: 'Subject not found' });
         }
         const subjectId = subjectResult.rows[0].id;
-        const enrollmentCheck = await pool.query(
-          'SELECT id FROM enrollments WHERE student_id = $1 AND subject_id = $2',
-          [studentId, subjectId]
-        );
-        if (enrollmentCheck.rows.length > 0) {
-          return res.status(409).json({ 
-            type: 'enrollment',
-            message: `Already enrolled in ${subjectName} (${subjectCode})`,
-            success: false 
-          });
+        
+        // Use INSERT ... ON CONFLICT to prevent duplicates
+        try {
+          const result = await pool.query(
+            'INSERT INTO enrollments (student_id, subject_id) VALUES ($1, $2) ON CONFLICT (student_id, subject_id) DO NOTHING RETURNING id',
+            [studentId, subjectId]
+          );
+          
+          // If no rows were inserted, it means there was a conflict (duplicate)
+          if (result.rows.length === 0) {
+            return res.status(409).json({ 
+              type: 'enrollment',
+              message: `Already enrolled in ${subjectName} (${subjectCode})`,
+              success: false 
+            });
+          }
+        } catch (error) {
+          console.error('Error inserting enrollment record:', error);
+          // If there's a constraint violation, it means duplicate
+          if (error.code === '23505') {
+            return res.status(409).json({ 
+              type: 'enrollment',
+              message: `Already enrolled in ${subjectName} (${subjectCode})`,
+              success: false 
+            });
+          }
+          throw error;
         }
-        await pool.query(
-          'INSERT INTO enrollments (student_id, subject_id) VALUES ($1, $2)',
-          [studentId, subjectId]
-        );
+        
         return res.json({
           type: 'enrollment',
           message: `Successfully enrolled in ${subjectName} (${subjectCode})!`,
@@ -923,21 +951,35 @@ export default async function handler(req, res) {
             return res.status(404).json({ error: 'Subject not found' });
           }
           const subjectId = subjectResult.rows[0].id;
-          const enrollmentCheck = await pool.query(
-            'SELECT id FROM enrollments WHERE student_id = $1 AND subject_id = $2',
-            [studentId, subjectId]
-          );
-          if (enrollmentCheck.rows.length > 0) {
-            return res.status(409).json({ 
-              type: 'enrollment',
-              message: `Already enrolled in ${subjectName} (${subjectCode})`,
-              success: false 
-            });
+          
+          // Use INSERT ... ON CONFLICT to prevent duplicates
+          try {
+            const result = await pool.query(
+              'INSERT INTO enrollments (student_id, subject_id) VALUES ($1, $2) ON CONFLICT (student_id, subject_id) DO NOTHING RETURNING id',
+              [studentId, subjectId]
+            );
+            
+            // If no rows were inserted, it means there was a conflict (duplicate)
+            if (result.rows.length === 0) {
+              return res.status(409).json({ 
+                type: 'enrollment',
+                message: `Already enrolled in ${subjectName} (${subjectCode})`,
+                success: false 
+              });
+            }
+          } catch (error) {
+            console.error('Error inserting enrollment record:', error);
+            // If there's a constraint violation, it means duplicate
+            if (error.code === '23505') {
+              return res.status(409).json({ 
+                type: 'enrollment',
+                message: `Already enrolled in ${subjectName} (${subjectCode})`,
+                success: false 
+              });
+            }
+            throw error;
           }
-          await pool.query(
-            'INSERT INTO enrollments (student_id, subject_id) VALUES ($1, $2)',
-            [studentId, subjectId]
-          );
+          
           return res.json({
             type: 'enrollment',
             message: `Successfully enrolled in ${subjectName} (${subjectCode})!`,
@@ -1045,21 +1087,35 @@ export default async function handler(req, res) {
               return res.status(404).json({ error: 'Subject not found' });
             }
             const subjectId = subjectResult.rows[0].id;
-            const enrollmentCheck = await pool.query(
-              'SELECT id FROM enrollments WHERE student_id = $1 AND subject_id = $2',
-              [studentId, subjectId]
-            );
-            if (enrollmentCheck.rows.length > 0) {
-              return res.status(409).json({ 
-                type: 'enrollment',
-                message: `Already enrolled in ${subjectName} (${subjectCode})`,
-                success: false 
-              });
+            
+            // Use INSERT ... ON CONFLICT to prevent duplicates
+            try {
+              const result = await pool.query(
+                'INSERT INTO enrollments (student_id, subject_id) VALUES ($1, $2) ON CONFLICT (student_id, subject_id) DO NOTHING RETURNING id',
+                [studentId, subjectId]
+              );
+              
+              // If no rows were inserted, it means there was a conflict (duplicate)
+              if (result.rows.length === 0) {
+                return res.status(409).json({ 
+                  type: 'enrollment',
+                  message: `Already enrolled in ${subjectName} (${subjectCode})`,
+                  success: false 
+                });
+              }
+            } catch (error) {
+              console.error('Error inserting enrollment record:', error);
+              // If there's a constraint violation, it means duplicate
+              if (error.code === '23505') {
+                return res.status(409).json({ 
+                  type: 'enrollment',
+                  message: `Already enrolled in ${subjectName} (${subjectCode})`,
+                  success: false 
+                });
+              }
+              throw error;
             }
-            await pool.query(
-              'INSERT INTO enrollments (student_id, subject_id) VALUES ($1, $2)',
-              [studentId, subjectId]
-            );
+            
             return res.json({
               type: 'enrollment',
               message: `Successfully enrolled in ${subjectName} (${subjectCode})!`,

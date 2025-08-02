@@ -106,11 +106,13 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
         if (data.session) {
           setActiveSession(data.session);
           setSelectedSessionId(String(data.session.id));
+          setSelectedAttendanceSessionId(String(data.session.id)); // Set this to fetch attendance data
         }
       })
       .catch(() => {
         setActiveSession(null);
         setSelectedSessionId("");
+        setSelectedAttendanceSessionId("");
       })
   }, [id, router])
 
@@ -134,7 +136,7 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
   // Update pending students when session attendance changes
   useEffect(() => {
     updatePendingStudents();
-  }, [sessionAttendance, selectedSessionId]);
+  }, [sessionAttendance, activeSession]);
 
   const handleLogout = () => {
     localStorage.removeItem("user")
@@ -164,12 +166,12 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
   };
 
   const handleManualAttendanceUpdate = async (studentId: number, status: 'present' | 'late' | 'absent' | 'pending') => {
-    if (!selectedSessionId) return;
+    if (!activeSession?.id) return;
     setAttendanceUpdateLoading((prev) => ({ ...prev, [studentId]: true }));
     setAttendanceUpdateResult((prev) => ({ ...prev, [studentId]: "" }));
     try {
       await apiClient.auth.manualAttendanceUpdate({
-        sessionId: selectedSessionId,
+        sessionId: String(activeSession.id),
         studentId: String(studentId),
         status,
       });
@@ -210,6 +212,7 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
   };
 
   const spinWheel = () => {
+    console.log('Spin wheel clicked. Pending students:', pendingStudents);
     if (pendingStudents.length === 0) {
       toast({
         title: "No pending students",
@@ -252,13 +255,16 @@ export default function SubjectDetailsPage({ params }: { params: Promise<{ id: s
   };
 
   const updatePendingStudents = () => {
-    if (!selectedSessionId) {
+    if (!activeSession) {
       setPendingStudents([]);
       return;
     }
 
     // Get pending students from the current session attendance
     const pending = sessionAttendance.filter((student: any) => student.status === 'pending');
+    console.log('Active session:', activeSession);
+    console.log('Session attendance:', sessionAttendance);
+    console.log('Pending students:', pending);
     setPendingStudents(pending);
   };
 
