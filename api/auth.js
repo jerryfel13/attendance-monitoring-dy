@@ -80,6 +80,7 @@ export default async function handler(req, res) {
     console.log('QR Code starts with ATTENDANCE_IN_', qrCode.startsWith("ATTENDANCE_IN_"));
     console.log('QR Code starts with ATTENDANCE_OUT_', qrCode.startsWith("ATTENDANCE_OUT_"));
     console.log('QR Code starts with ATTENDANCE_', qrCode.startsWith("ATTENDANCE_"));
+    console.log('QR Code exact match ATTENDANCE_IN_Test_Subject_1234_2025-08-05:', qrCode === "ATTENDANCE_IN_Test_Subject_1234_2025-08-05");
     console.log('QR Code trimmed:', qrCode.trim());
     console.log('QR Code starts with ATTENDANCE_OUT_ (trimmed):', qrCode.trim().startsWith("ATTENDANCE_OUT_"));
     console.log('QR Code first 20 characters:', qrCode.substring(0, 20));
@@ -205,9 +206,14 @@ export default async function handler(req, res) {
         });
       } else if (qrCode.startsWith("ATTENDANCE_IN_")) {
         // SCAN-IN logic (new format with ATTENDANCE_IN_)
+        console.log('✅ MATCHED ATTENDANCE_IN_ condition');
         console.log('Processing ATTENDANCE_IN_ QR code:', qrCode);
         const attendanceInfo = qrCode.replace("ATTENDANCE_IN_", "").trim();
         const parts = attendanceInfo.split('_');
+        
+        console.log('ATTENDANCE_IN_ - attendanceInfo:', attendanceInfo);
+        console.log('ATTENDANCE_IN_ - parts:', parts);
+        console.log('ATTENDANCE_IN_ - parts.length:', parts.length);
         
         if (parts.length < 3) {
           return res.status(400).json({ error: 'Invalid attendance QR code format' });
