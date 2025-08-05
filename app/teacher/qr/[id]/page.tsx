@@ -58,7 +58,7 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
         setSubject(data.subject)
         // Simplified QR codes for better scanning
         setEnrollmentQR(`SUBJECT_${data.subject.name.replace(/\s+/g, '_')}_${data.subject.code}`)
-        setAttendanceQR(`ATTENDANCE_IN_${data.subject.name.replace(/\s+/g, '_')}_${data.subject.code}_${new Date().toISOString().split('T')[0]}`)
+        setAttendanceQR(`ATTENDANCE_${data.subject.name.replace(/\s+/g, '_')}_${data.subject.code}_${new Date().toISOString().split('T')[0]}`)
         setAttendanceOutQR(`ATTENDANCE_OUT_${data.subject.name.replace(/\s+/g, '_')}_${data.subject.code}_${new Date().toISOString().split('T')[0]}`)
       })
       .catch(() => setSubject(null))
@@ -90,14 +90,14 @@ export default function QRManagementPage({ params }: { params: Promise<{ id: str
   }
 
   const regenerateAttendanceQR = () => {
-    const newQR = `ATTENDANCE_IN_${subject.name.replace(/\s+/g, '_')}_${subject.code}_${new Date().toISOString().split('T')[0]}`
+    const newQR = `ATTENDANCE_${subject.name.replace(/\s+/g, '_')}_${subject.code}_${new Date().toISOString().split('T')[0]}`
     setAttendanceQR(newQR)
     setAttendanceOutQR(`ATTENDANCE_OUT_${subject.name.replace(/\s+/g, '_')}_${subject.code}_${new Date().toISOString().split('T')[0]}`)
   }
 
   const startAttendanceSession = async () => {
     try {
-      const qrData = `ATTENDANCE_IN_${subject.name.replace(/\s+/g, '_')}_${subject.code}_${new Date().toISOString().split('T')[0]}`
+      const qrData = `ATTENDANCE_${subject.name.replace(/\s+/g, '_')}_${subject.code}_${new Date().toISOString().split('T')[0]}`
       setAttendanceQR(qrData)
       
       // Always use the current time when the session is actually started
