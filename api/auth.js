@@ -77,8 +77,9 @@ export default async function handler(req, res) {
     console.log('QR Code length:', qrCode.length);
     console.log('QR Code starts with SUBJECT:', qrCode.startsWith("SUBJECT:"));
     console.log('QR Code starts with ATTENDANCE:', qrCode.startsWith("ATTENDANCE:"));
-    console.log('QR Code starts with ATTENDANCE_', qrCode.startsWith("ATTENDANCE_"));
+    console.log('QR Code starts with ATTENDANCE_IN_', qrCode.startsWith("ATTENDANCE_IN_"));
     console.log('QR Code starts with ATTENDANCE_OUT_', qrCode.startsWith("ATTENDANCE_OUT_"));
+    console.log('QR Code starts with ATTENDANCE_', qrCode.startsWith("ATTENDANCE_"));
     console.log('QR Code trimmed:', qrCode.trim());
     console.log('QR Code starts with ATTENDANCE_OUT_ (trimmed):', qrCode.trim().startsWith("ATTENDANCE_OUT_"));
     console.log('QR Code first 20 characters:', qrCode.substring(0, 20));
@@ -200,6 +201,144 @@ export default async function handler(req, res) {
         return res.json({
           type: 'enrollment',
           message: `Successfully enrolled in ${subjectName} (${subjectCode})!`,
+          success: true
+        });
+      } else if (qrCode.startsWith("ATTENDANCE_IN_")) {
+        // SCAN-IN logic (new format with ATTENDANCE_IN_)
+        console.log('Processing ATTENDANCE_IN_ QR code:', qrCode);
+        const attendanceInfo = qrCode.replace("ATTENDANCE_IN_", "").trim();
+        const parts = attendanceInfo.split('_');
+        
+        if (parts.length < 3) {
+          return res.status(400).json({ error: 'Invalid attendance QR code format' });
+        }
+        
+        const date = parts[parts.length - 1];
+        const subjectCode = parts[parts.length - 2];
+        const subjectName = parts.slice(0, -2).join(' ').replace(/_/g, ' ');
+        
+        console.log('ATTENDANCE_IN_ - Parsed subject name:', subjectName.trim());
+        console.log('ATTENDANCE_IN_ - Parsed subject code:', subjectCode.trim());
+        console.log('ATTENDANCE_IN_ - Parsed date:', date.trim());
+        
+        const subjectResult = await pool.query(
+          'SELECT id FROM subjects WHERE TRIM(name) = $1 AND TRIM(code) = $2',
+          [subjectName.trim(), subjectCode.trim()]
+        );
+        if (subjectResult.rows.length === 0) {
+          console.log('Subject not found for:', subjectName.trim(), subjectCode.trim());
+          return res.status(404).json({ error: 'Subject not found' });
+        }
+        const subjectId = subjectResult.rows[0].id;
+        const enrollmentCheck = await pool.query(
+          'SELECT id FROM enrollments WHERE student_id = $1 AND subject_id = $2',
+          [studentId, subjectId]
+        );
+        if (enrollmentCheck.rows.length === 0) {
+          return res.status(403).json({ 
+            type: 'attendance',
+            message: 'You are not enrolled in this subject',
+            success: false 
+          });
+        }
+        const sessionResult = await pool.query(
+          'SELECT id, session_date, session_time FROM attendance_sessions WHERE subject_id = $1 AND is_active = true ORDER BY session_date DESC, session_time DESC LIMIT 1',
+          [subjectId]
+        );
+        if (sessionResult.rows.length === 0) {
+          return res.status(404).json({ 
+            type: 'attendance',
+            message: 'No active attendance session found for this subject',
+            success: false 
+          });
+        }
+        const sessionId = sessionResult.rows[0].id;
+        const attendanceCheck = await pool.query(
+          'SELECT id, status, check_in_time FROM attendance_records WHERE session_id = $1 AND student_id = $2',
+          [sessionId, studentId]
+        );
+        if (attendanceCheck.rows.length > 0) {
+          const existingRecord = attendanceCheck.rows[0];
+          if (['present', 'late', 'absent'].includes(existingRecord.status)) {
+            return res.status(409).json({ 
+              type: 'attendance',
+              message: 'Already scanned in for this session. Please scan out at the end of class.',
+              success: false 
+            });
+          }
+          if (existingRecord.status === 'pending') {
+            return res.json({
+              type: 'attendance',
+              message: 'Already scanned in for this session. Please scan out at the end of class.',
+              success: false
+            });
+          }
+        }
+        
+        // Calculate late status immediately upon check-in
+        const session = sessionResult.rows[0];
+        const sessionStartTime = new Date(`${session.session_date}T${session.session_time}`);
+        const checkInTime = new Date();
+        const timeDifference = (checkInTime - sessionStartTime) / (1000 * 60);
+        
+        // Get subject late threshold
+        const subjectData = await pool.query(
+          'SELECT late_threshold FROM subjects WHERE id = $1',
+          [subjectId]
+        );
+        
+        const lateThreshold = subjectData.rows[0]?.late_threshold || 15;
+        let isLate = false;
+        
+        console.log(`QR scan-in (ATTENDANCE_IN_ format) calculation for student ${studentId}:`);
+        console.log(`  - session_date: ${session.session_date}`);
+        console.log(`  - session_time: ${session.session_time}`);
+        console.log(`  - session_start_time: ${sessionStartTime}`);
+        console.log(`  - check_in_time: ${checkInTime}`);
+        console.log(`  - time_difference: ${timeDifference} minutes`);
+        console.log(`  - late_threshold: ${lateThreshold} minutes`);
+        
+        if (timeDifference > lateThreshold) {
+          isLate = true;
+          console.log(`  - RESULT: Student is LATE (${timeDifference} > ${lateThreshold})`);
+        } else {
+          console.log(`  - RESULT: Student is ON TIME (${timeDifference} <= ${lateThreshold})`);
+        }
+        
+        // Mark attendance as pending with late status immediately
+        console.log(`Inserting attendance record with is_late = ${isLate} (type: ${typeof isLate})`);
+        
+        // Use INSERT ... ON CONFLICT to prevent duplicates
+        try {
+          const result = await pool.query(
+            'INSERT INTO attendance_records (session_id, student_id, status, check_in_time, is_late) VALUES ($1, $2, $3, NOW(), $4) ON CONFLICT (session_id, student_id) DO NOTHING RETURNING id',
+            [sessionId, studentId, 'pending', Boolean(isLate)]
+          );
+          
+          // If no rows were inserted, it means there was a conflict (duplicate)
+          if (result.rows.length === 0) {
+            return res.status(409).json({ 
+              type: 'attendance',
+              message: 'Already scanned in for this session. Please scan out at the end of class.',
+              success: false 
+            });
+          }
+        } catch (error) {
+          console.error('Error inserting attendance record:', error);
+          // If there's a constraint violation, it means duplicate
+          if (error.code === '23505') {
+            return res.status(409).json({ 
+              type: 'attendance',
+              message: 'Already scanned in for this session. Please scan out at the end of class.',
+              success: false 
+            });
+          }
+          throw error;
+        }
+        
+        return res.json({
+          type: 'attendance',
+          message: 'Scan-in successful. Please scan out at the end of class to confirm your attendance.',
           success: true
         });
       } else if (qrCode.startsWith("ATTENDANCE_OUT_")) {
