@@ -624,10 +624,34 @@ export default async function handler(req, res) {
         
         // Mark attendance as pending with late status immediately
         console.log(`Inserting attendance record with is_late = ${isLate} (type: ${typeof isLate})`);
-        await pool.query(
-          'INSERT INTO attendance_records (session_id, student_id, status, check_in_time, is_late) VALUES ($1, $2, $3, NOW(), $4)',
-          [sessionId, studentId, 'pending', Boolean(isLate)]
-        );
+        
+        // Use INSERT ... ON CONFLICT to prevent duplicates
+        try {
+          const result = await pool.query(
+            'INSERT INTO attendance_records (session_id, student_id, status, check_in_time, is_late) VALUES ($1, $2, $3, NOW(), $4) ON CONFLICT (session_id, student_id) DO NOTHING RETURNING id',
+            [sessionId, studentId, 'pending', Boolean(isLate)]
+          );
+          
+          // If no rows were inserted, it means there was a conflict (duplicate)
+          if (result.rows.length === 0) {
+            return res.status(409).json({ 
+              type: 'attendance',
+              message: 'Already scanned in for this session. Please scan out at the end of class.',
+              success: false 
+            });
+          }
+        } catch (error) {
+          console.error('Error inserting attendance record:', error);
+          // If there's a constraint violation, it means duplicate
+          if (error.code === '23505') {
+            return res.status(409).json({ 
+              type: 'attendance',
+              message: 'Already scanned in for this session. Please scan out at the end of class.',
+              success: false 
+            });
+          }
+          throw error;
+        }
         
         return res.json({
           type: 'attendance',
